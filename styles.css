@@ -959,3 +959,5 @@ td .card-text { font-size:12px; }
   .recipe-card th,.recipe-card td { border-color:#aaa; }
   button,input,select,textarea { display:none !important; }
 }
+
+.test-notice { margin:0; padding:12px 16px; background:#fff4df; color:#593b14; text-align:center; line-height:1.6; }

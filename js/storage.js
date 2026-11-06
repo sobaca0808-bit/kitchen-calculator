@@ -4,7 +4,8 @@
   else root.KitchenStorage = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
-  const KEY = 'kitchen-calculator-v1';
+  // Separate preview namespace: never read or write the live calculator key.
+  const KEY = 'kitchen-calculator-pr2-browser-test-v1';
   const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
   const MAX_RECIPE_DEPTH = 100;
   const UNITS = ['g', 'kg', 'ml', 'l', 'pcs'];

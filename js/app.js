@@ -330,7 +330,7 @@
     if(dirty && !saveDraft()) return;
     try {
       const text = S.stringify(state), url = URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
-      const link = document.createElement('a');link.href = url;link.download = 'kitchen-calculator-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);
+      const link = document.createElement('a');link.href = url;link.download = 'kitchen-calculator-PR2-TEST-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);
       message('JSON подготовлен к скачиванию. Сохраните файл для резервной копии.');
     } catch(e) {message('Экспорт не выполнен: '+e.message,true);}
   });
