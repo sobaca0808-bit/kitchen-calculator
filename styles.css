@@ -918,3 +918,44 @@ body:has(.ingredient-row input:focus) .form-actions,body:has(textarea:focus) .fo
 body:has(.editor input:focus) .form-actions,body:has(.editor textarea:focus) .form-actions {
   position:static;
 }
+
+button { min-height:44px; }
+button:active { transform:translateY(1px); filter:brightness(.93); }
+button.saved { background:#184c39; box-shadow:0 0 0 3px #24634d22; }
+button:disabled { opacity:.55; cursor:default; }
+.card-controls { display:flex; flex-wrap:wrap; align-items:end; gap:10px; padding:20px; border-bottom:1px solid var(--line); }
+.card-controls label { max-width:185px; }
+#view-error { width:100%; color:var(--red); margin:0; }
+.recipe-card { padding:28px; overflow-wrap:anywhere; line-height:1.6; }
+.recipe-card h1 { font-size:26px; }
+.recipe-card h2 { margin-top:24px; font-size:18px; }
+.recipe-card table { width:100%; border-collapse:collapse; table-layout:fixed; margin:20px 0; }
+.recipe-card th,.recipe-card td { text-align:left; padding:10px 7px; border:1px solid var(--line); vertical-align:top; }
+.recipe-card th:first-child { width:40%; }
+.card-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+td .card-text { font-size:12px; }
+.card-cost { font-weight:700; }
+@media(max-width:760px) {
+  .recipe-card { padding:16px 10px; font-size:13px; }
+  .recipe-card th,.recipe-card td { padding:7px 4px; }
+  .card-controls { padding:14px; }
+  .card-controls input,.card-controls select { font-size:16px; }
+  .form-actions button { min-height:44px; font-size:12px; }
+  .library-item { min-height:60px; }
+}
+@page { size:A4; margin:15mm; }
+@media print {
+  body { background:white; color:black; font-size:11pt; }
+  body > :not(.workspace), .library, .card-controls, .editor > :not(.recipe-card) { display:none !important; }
+  .workspace { display:block; margin:0; max-width:none; }
+  .editor { border:0; box-shadow:none; border-radius:0; }
+  .recipe-card { padding:0; font-size:11pt; }
+  .recipe-card h1 { font-size:20pt; }
+  .recipe-card table { font-size:10pt; }
+  .recipe-card thead { display:table-header-group; }
+  .recipe-card tr { break-inside:avoid; }
+  .recipe-card h1,.recipe-card h2 { break-after:avoid; }
+  .card-text { orphans:3; widows:3; }
+  .recipe-card th,.recipe-card td { border-color:#aaa; }
+  button,input,select,textarea { display:none !important; }
+}

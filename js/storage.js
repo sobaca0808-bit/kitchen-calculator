@@ -68,6 +68,8 @@
       return {
         id: id(item.id, label + ', id'), type: item.type,
         name: text(item.name, label + ', название', true, 500), note: text(item.note, label + ', заметка'),
+        ...(item.portions !== undefined ? {portions: number(item.portions, label + ', порции', true) ?? 1} : {}),
+        ...(item.technology !== undefined ? {technology: text(item.technology, label + ', технология')} : {}),
         actualYield: number(item.actualYield, label + ', фактический выход', true),
         ingredients: item.ingredients.map((row, rowIndex) => {
           const prefix = label + ', строка ' + (rowIndex + 1);

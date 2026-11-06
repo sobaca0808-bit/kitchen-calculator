@@ -9,15 +9,18 @@
   const num = (n, digits = 3) => n == null ? '' : new Intl.NumberFormat('ru-RU',{maximumFractionDigits:digits,useGrouping:false}).format(n);
   const unitOptions = selected => Object.entries(C.units).map(([value,u]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${u.label}</option>`).join('');
   const loaded = S.load();
-  let state = loaded.data || KitchenSeed.create();
+  let state = loaded.data || (loaded.error ? {version:1,products:[],recipes:[]} : KitchenSeed.create());
+  let recoveryRequired = !!loaded.error;
   let section = 'dish', selectedId = state.recipes.find(r => r.type === 'dish')?.id || null;
+  let viewing = true, viewPortions = 1, showPrices = true;
   let draft = null, dirty = false, isNew = false, errors = new Map(), invalidValues = new Map(), storageBlocked = !!loaded.error;
   const editor = $('#editor');
 
   function message(text, error = false) {
     const el = $('#message'); el.textContent = text; el.className = error ? 'error' : ''; el.hidden = false;
   }
-  function persist(candidate, success) {
+  function persist(candidate, success, restore = false) {
+    if (recoveryRequired && !restore) {message('Сохранение заблокировано: исходное хранилище не удалось прочитать. Восстановите резервную копию через импорт JSON. Исходные данные не изменены.',true);return false;}
     let clean;
     try { clean = S.validate(candidate); } catch(e) { message(e.message, true); return false; }
     const result = S.save(clean);
@@ -25,7 +28,7 @@
     if (!result.ok) {
       storageBlocked = true;
       message('Не удалось сохранить в браузере: ' + result.error + ' Изменения пока в памяти. Скачайте экспорт JSON до закрытия страницы.', true);
-    } else { storageBlocked = false; message(success || 'Данные сохранены в этом браузере.'); }
+    } else { recoveryRequired = false; storageBlocked = false; message(success || 'Данные сохранены в этом браузере.'); }
     return true;
   }
   function collection() { return section === 'products' ? state.products : state.recipes.filter(r => r.type === section); }
@@ -39,7 +42,7 @@
     return next;
   }
   function canLeave() { return !dirty || confirm('Есть несохранённые изменения. Перейти и отменить их?'); }
-  function markDirty() { dirty = true; const el = $('#save-state'); if (el) el.textContent = 'Не сохранено'; }
+  function markDirty() { dirty = true; const button = $('#save-item'); if(button) {button.textContent = 'Сохранить';button.classList.remove('saved');} const el = $('#save-state'); if (el) el.textContent = 'Не сохранено'; }
   function numeric(input, options = {}) {
     try {
       const value = C.parseNumber(input.value);
@@ -56,7 +59,7 @@
     return `<input id="${id}" type="text" inputmode="decimal" autocomplete="off" value="${esc(invalidValues.has(id) ? invalidValues.get(id) : num(value,8))}" placeholder="${placeholder}">`;
   }
   function renderLibrary() {
-    const labels = {dish:['Блюда','Новое блюдо'],prep:['Полуфабрикаты','Новый полуфабрикат'],products:['Продукты','Новый продукт']};
+    const labels = {dish:['Мои рецепты','Новое блюдо'],prep:['Полуфабрикаты','Новый полуфабрикат'],products:['Продукты','Новый продукт']};
     $('#section-title').textContent = labels[section][0]; $('#create').textContent = '+ ' + labels[section][1];
     for (const key of ['dish','prep','products']) {
       $(`#count-${key}`).textContent = key === 'products' ? state.products.length : state.recipes.filter(r => r.type === key).length;
@@ -71,7 +74,7 @@
         caption = base.value == null ? 'Нет цены' : money(base.value) + ' / ' + C.units[base.unit].label;
       } else {
         const result = C.calcRecipe(state,item.id);
-        caption = result.complete ? money(result.knownCost) + (section === 'prep' ? ' / партия' : ' / порция') : 'Неполная калькуляция';
+        caption = section === 'dish' ? 'Открыть технологическую карту' : result.complete ? money(result.knownCost) + (section === 'prep' ? ' / партия' : ' / порция') : 'Неполная калькуляция';
       }
       return `<button class="library-item ${item.id === selectedId ? 'active' : ''}" data-open="${esc(item.id)}"><strong>${esc(item.name)}</strong><small>${esc(caption)}</small></button>`;
     }).join('') : '<p class="field-help">Ничего не найдено. Создайте новую запись.</p>';
@@ -82,6 +85,7 @@
   }
   function openSelected() {
     draft = clone(collection().find(item => item.id === selectedId) || null);
+    viewing = section === 'dish'; viewPortions = draft?.portions || 1;
     dirty = false; isNew = false; errors.clear();invalidValues.clear(); renderLibrary(); renderEditor();
   }
   function switchSection(next) {
@@ -89,19 +93,39 @@
     section = next; $('#library-search').value = ''; selectedId = collection()[0]?.id || null; openSelected();
   }
   function renderEditor() {
-    if (!draft) { editor.innerHTML = '<div class="empty-state"><h2>Начните с новой записи</h2><p>Добавьте продукт или составьте рецептуру<br>кнопкой в справочнике.</p></div>'; return; }
-    if (section === 'products') renderProduct(); else renderRecipe();
+    if (!draft) { editor.innerHTML = `<div class="empty-state"><h2>${section === 'dish' && collection().length ? 'Выберите рецепт из списка' : 'Начните с новой записи'}</h2><p>Откройте сохранённую запись или создайте новую<br>кнопкой в справочнике.</p></div>`; return; }
+    if (section === 'dish' && viewing) renderCard();
+    else if (section === 'products') renderProduct(); else renderRecipe();
+  }
+  function renderCard() {
+    editor.innerHTML = `<div class="card-controls"><button id="back-list">← К списку</button><button id="edit-recipe">Изменить</button><button id="print-recipe">Печать</button><label>Количество порций<input id="view-portions" type="text" inputmode="decimal" value="${esc(num(viewPortions,8))}"></label><label>ПОКАЗЫВАТЬ ЦЕНЫ<select id="show-prices"><option value="yes" ${showPrices ? 'selected' : ''}>ДА</option><option value="no" ${!showPrices ? 'selected' : ''}>НЕТ</option></select></label><p id="view-error" role="status"></p></div><article id="recipe-card" class="recipe-card"></article>`;
+    function draw() {
+      try {
+        viewPortions = C.parseNumber($('#view-portions').value);
+        const view = KitchenRecipeView.scale(state,draft.id,viewPortions);
+        const result = view.result, recipe = view.recipe;
+        $('#recipe-card').innerHTML = `<p class="eyebrow">ТЕХНОЛОГИЧЕСКАЯ КАРТА</p><h1>${esc(recipe.name)}</h1><p>Количество порций: ${esc(num(viewPortions,8))}</p><table><thead><tr><th>Ингредиент</th><th>Кол-во</th><th>Выход, г</th>${showPrices ? '<th>Сумма</th>' : ''}</tr></thead><tbody>${recipe.ingredients.map((row,i) => `<tr><td>${esc(findRef(row.refId)?.name || 'Ингредиент не выбран')}${row.note ? `<div class="card-text">${esc(row.note)}</div>` : ''}</td><td>${row.quantity == null ? 'Не задано' : esc(num(row.quantity,8))+' '+esc(C.units[row.unit].label)}</td><td>${result.rows[i].massGrams == null ? 'Неизвестен' : esc(num(result.rows[i].massGrams))}</td>${showPrices ? `<td>${esc(money(result.rows[i].knownCost))}${result.rows[i].complete ? '' : ' (неполно)'}</td>` : ''}</tr>`).join('')}</tbody></table><p>Общая масса ингредиентов: ${view.rawMass == null ? 'неизвестна — задайте коэффициенты массы' : esc(num(view.rawMass))+' г'}</p><p><strong>Выход готового блюда: ${view.yieldGrams == null ? 'неизвестен — уточните массу компонентов' : esc(num(view.yieldGrams))+' г'}</strong></p>${showPrices ? `<p class="card-cost">${result.complete ? 'Общая себестоимость' : 'Известная часть стоимости (расчёт неполный)'}: ${esc(money(result.knownCost))}</p>` : ''}${recipe.technology?.trim() ? `<h2>Способ приготовления</h2><div class="card-text">${esc(recipe.technology)}</div>` : ''}${recipe.note?.trim() ? `<h2>Примечания</h2><div class="card-text">${esc(recipe.note)}</div>` : ''}`;
+        $('#view-error').textContent = '';$('#print-recipe').disabled = false;
+      } catch(e) {$('#view-error').textContent = e.message;$('#print-recipe').disabled = true;}
+    }
+    $('#view-portions').addEventListener('input',draw);
+    $('#show-prices').addEventListener('change',e => {showPrices=e.target.value==='yes';draw();});
+    $('#edit-recipe').addEventListener('click',() => {viewing=false;renderEditor();});
+    $('#back-list').addEventListener('click',() => {selectedId=null;openSelected();$('#library-search').focus();});
+    $('#print-recipe').addEventListener('click',() => window.print());
+    draw();
   }
   function head(type, description) {
     return `<div class="editor-head"><div class="editor-topline"><span class="badge">${type}</span><span class="save-state" id="save-state">${dirty ? 'Не сохранено' : storageBlocked ? 'В памяти · скачайте JSON' : 'Сохранено в браузере'}</span></div><label><span class="sr-only">Название</span><input id="item-name" class="name-input" value="${esc(draft.name)}" placeholder="Введите название" maxlength="300"></label><p class="intro">${description}</p></div>`;
   }
   function actions(recipe) {
-    return `<div class="form-actions">${recipe ? '<div id="mobile-summary" class="mobile-summary" aria-live="polite"></div>' : ''}${recipe ? '<button id="add-row">+ Добавить продукт</button>' : ''}<button id="delete-item" class="danger">Удалить</button><button id="save-item" class="primary">Сохранить</button></div>`;
+    return `<div class="form-actions">${recipe ? '<div id="mobile-summary" class="mobile-summary" aria-live="polite"></div>' : ''}${section === 'dish' ? '<button id="view-recipe">К карточке</button>' : ''}${recipe ? '<button id="add-row">+ Добавить продукт</button>' : ''}<button id="delete-item" class="danger">Удалить</button><button id="save-item" class="primary">Сохранить</button></div>`;
   }
   function bindCommon() {
     $('#item-name').addEventListener('input', e => { draft.name = e.target.value; markDirty(); });
     $('#save-item').addEventListener('click', saveDraft);
     $('#delete-item').addEventListener('click', deleteItem);
+    $('#view-recipe')?.addEventListener('click', () => {if (!canLeave()) return; if(isNew) {selectedId = null;openSelected();return;} openSelected();});
   }
   function renderProduct() {
     editor.innerHTML = head('Справочник продуктов','Закупочная цена относится ко всей упаковке. Пустая цена означает «Нет цены».') + `<div class="editor-content"><div class="product-grid">
@@ -133,10 +157,16 @@
     $('#form-error').textContent = [...errors.values()][0] || '';
   }
   function renderRecipe() {
-    editor.innerHTML = head(section === 'prep' ? 'Полуфабрикат · партия' : 'Блюдо · одна порция',section === 'prep' ? 'Сырьё считается по закупочной стоимости. Себестоимость готового продукта зависит от фактического выхода партии.' : 'Выбирайте продукты и готовые полуфабрикаты. Их производственные потери уже учтены.') + `<div class="editor-content"><div class="section-heading"><h3>Ингредиенты</h3><small id="row-count"></small></div><div class="ingredient-head" aria-hidden="true"><span>Продукт / полуфабрикат</span><span>Количество</span><span>Ед.</span><span>Стоимость</span><span></span></div><div id="ingredients"></div>
+    editor.innerHTML = head(section === 'prep' ? 'Полуфабрикат · партия' : 'Блюдо · рецептура',section === 'prep' ? 'Сырьё считается по закупочной стоимости. Себестоимость готового продукта зависит от фактического выхода партии.' : 'Выбирайте продукты и готовые полуфабрикаты. Их производственные потери уже учтены.') + `<div class="editor-content"><div class="section-heading"><h3>Ингредиенты</h3><small id="row-count"></small></div><div class="ingredient-head" aria-hidden="true"><span>Продукт / полуфабрикат</span><span>Количество</span><span>Ед.</span><span>Стоимость</span><span></span></div><div id="ingredients"></div>
       ${section === 'prep' ? `<div class="yield-panel"><div><h3>Фактический выход партии</h3><p>Взвесьте всю готовую партию. По этому значению рассчитывается себестоимость грамма и килограмма.</p></div><label>Выход готовой партии, г${numericInput('actualYield',draft.actualYield,'Обязательно')}</label></div>` : ''}
+      ${section === 'dish' ? `<div class="product-grid recipe-note"><label>Количество порций в рецепте${numericInput('recipe-portions',draft.portions || 1)}</label><label>Фактический выход блюда, г (необязательно)${numericInput('dish-yield',draft.actualYield)}</label></div>` : ''}
+      <label class="recipe-note">Способ приготовления<textarea id="technology" maxlength="10000">${esc(draft.technology)}</textarea></label>
       <details class="recipe-note" ${draft.note ? 'open' : ''}><summary>Заметка к рецепту</summary><textarea id="recipe-note" placeholder="Что нужно уточнить или учесть">${esc(draft.note)}</textarea></details><div id="summary" class="summary" aria-live="polite"></div><p id="form-error" class="inline-error" role="status"></p></div>` + actions(true);
     bindCommon(); renderRows();
+    $('#technology').addEventListener('input', e => {draft.technology = e.target.value;markDirty();});
+    for (const [id,key] of [['recipe-portions','portions'],['dish-yield','actualYield']]) {
+      $('#'+id)?.addEventListener('input', e => {const parsed = numeric(e.target,{positive:true}); if(parsed.ok) {if(key === 'portions' && parsed.value == null) {errors.set(id,'Укажите количество порций.');e.target.setAttribute('aria-invalid','true');e.target.setCustomValidity('Укажите количество порций.');} else draft[key] = parsed.value;} markDirty();updateRecipeSummary();});
+    }
     $('#add-row').addEventListener('click',() => {
       draft.ingredients.push({id:uid('row'),refId:null,quantity:null,unit:'g',lossPercent:null,outputGrams:null,note:''});
       markDirty();renderRows();updateRecipeSummary();
@@ -259,10 +289,10 @@
       el.innerHTML = `<span>Стоимость</span>${r.complete ? esc(money(r.knownCost)) : r.knownCost > 0 ? esc(money(r.knownCost))+'*' : '—'}${!r.complete ? '<small>Неполно</small>' : ''}`;
     });
     const incomplete = !result.complete || errors.size > 0;
-    $('#mobile-summary').innerHTML = `<span>${incomplete ? 'Известная часть · неполно' : section === 'prep' ? 'Стоимость партии' : 'Себестоимость порции'}</span><strong>${esc(money(result.knownCost))}</strong>`;
+    $('#mobile-summary').innerHTML = `<span>${incomplete ? 'Известная часть · неполно' : section === 'prep' ? 'Стоимость партии' : 'Себестоимость рецепта'}</span><strong>${esc(money(result.knownCost))}</strong>`;
     const allIssues = [...errors.values(),...result.issues];
     const summary = $('#summary');summary.className = 'summary'+(incomplete ? ' incomplete' : '');
-    summary.innerHTML = `<div class="summary-top"><div><div class="summary-label">${incomplete ? 'Известная часть стоимости' : section === 'prep' ? 'Стоимость всей партии' : 'Продуктовая себестоимость порции'}</div><div class="summary-value">${esc(money(result.knownCost))}</div><div class="summary-meta">${section === 'prep' ? 'Фактический выход' : 'Вес порции'}: ${result.massGrams == null ? 'неизвестен — нужна масса всех компонентов' : esc(num(result.massGrams))+' г'}${section === 'prep' && !incomplete && result.costPerGram != null ? `<br>${esc(money(result.costPerGram))} / г · ${esc(money(result.costPerGram*1000))} / кг` : ''}</div></div><span class="summary-status">${incomplete ? 'Расчёт неполный' : 'Рассчитано'}</span></div>${incomplete ? `<ul class="issues">${[...new Set(allIssues)].map(s => `<li>${esc(s)}</li>`).join('')}</ul><p class="draft-note">Известная часть суммы не является полной продуктовой себестоимостью.</p>` : ''}`;
+    summary.innerHTML = `<div class="summary-top"><div><div class="summary-label">${incomplete ? 'Известная часть стоимости' : section === 'prep' ? 'Стоимость всей партии' : 'Продуктовая себестоимость рецепта'}</div><div class="summary-value">${esc(money(result.knownCost))}</div><div class="summary-meta">${section === 'prep' ? 'Фактический выход' : 'Расчётный выход рецепта'}: ${result.massGrams == null ? 'неизвестен — нужна масса всех компонентов' : esc(num(result.massGrams))+' г'}${section === 'prep' && !incomplete && result.costPerGram != null ? `<br>${esc(money(result.costPerGram))} / г · ${esc(money(result.costPerGram*1000))} / кг` : ''}</div></div><span class="summary-status">${incomplete ? 'Расчёт неполный' : 'Рассчитано'}</span></div>${incomplete ? `<ul class="issues">${[...new Set(allIssues)].map(s => `<li>${esc(s)}</li>`).join('')}</ul><p class="draft-note">Известная часть суммы не является полной продуктовой себестоимостью.</p>` : ''}`;
     $('#form-error').textContent = errors.size ? 'Исправьте ввод: '+[...errors.values()][0] : '';
   }
   function saveDraft() {
@@ -270,9 +300,11 @@
     if (errors.size) {message('Исправьте ошибки в числовых полях перед сохранением.',true);editor.querySelector('[aria-invalid="true"]')?.focus();return false;}
     draft.name = draft.name.trim();
     const candidate = currentState();
-    if(!persist(candidate,'Запись сохранена. Связанные калькуляции пересчитаны.')) return false;
+    if(!persist(candidate,'Сохранено ✓. Связанные калькуляции пересчитаны.')) return false;
     selectedId = draft.id;dirty = false;isNew = false;
     $('#save-state').textContent = storageBlocked ? 'В памяти · скачайте JSON' : 'Сохранено в браузере';
+    $('#save-item').textContent = storageBlocked ? 'Повторить сохранение' : 'Сохранено ✓';
+    $('#save-item').classList.toggle('saved', !storageBlocked);
     renderLibrary();return true;
   }
   function deleteItem() {
@@ -287,8 +319,9 @@
   $('#create').addEventListener('click',() => {
     if(!canLeave()) return;
     draft = section === 'products' ? {id:uid('product'),name:'',aliases:'',price:null,packQuantity:1,unit:'kg',massPerPiece:null,gramsPerMl:null,note:''} : {id:uid(section),type:section,name:'',note:'',actualYield:null,ingredients:[]};
-    selectedId = draft.id;dirty = true;isNew = true;errors.clear();invalidValues.clear();renderLibrary();renderEditor();$('#item-name').focus();
+    viewing = false;selectedId = draft.id;dirty = true;isNew = true;errors.clear();invalidValues.clear();renderLibrary();renderEditor();$('#item-name').focus();
   });
+  $('.brand').addEventListener('click', e => {e.preventDefault();if(canLeave()) {section = 'dish';selectedId = null;openSelected();}});
   $('[data-tab="dish"]').addEventListener('click',() => switchSection('dish'));
   $('[data-tab="prep"]').addEventListener('click',() => switchSection('prep'));
   $('[data-tab="products"]').addEventListener('click',() => switchSection('products'));
@@ -308,14 +341,14 @@
       if(file.size > 10*1024*1024) throw Error('Файл больше 10 МБ.');
       const candidate = S.parseJSON(await file.text());
       if(!confirm(`Заменить все текущие данные данными из файла? Продуктов: ${candidate.products.length}, рецептов: ${candidate.recipes.length}. Несохранённые изменения также будут заменены. Рекомендуем сначала сделать экспорт.`)) return;
-      if(persist(candidate,'Данные импортированы. Все текущие записи заменены.')) {
+      if(persist(candidate,'Данные импортированы. Все текущие записи заменены.',true)) {
         selectedId = collection()[0]?.id || null;openSelected();
       }
     } catch(e) {message('Импорт отменён: '+e.message+' Текущие данные не изменены.',true);}
   });
   window.addEventListener('beforeunload',e => {if(dirty || storageBlocked) {e.preventDefault();e.returnValue = '';}});
   openSelected();
-  if(loaded.error) message('Не удалось прочитать сохранённые данные: '+loaded.error+' Исходная запись не перезаписана. Показан начальный черновик; восстановите данные через импорт или скачайте экспорт.',true);
+  if(loaded.error) message('Не удалось прочитать сохранённые данные: '+loaded.error+' Исходная запись не перезаписана. Автоматическая запись заблокирована; восстановите данные через импорт резервной копии JSON.',true);
   else if(!loaded.data) {
     const saved = S.save(state);
     if(!saved.ok) {storageBlocked = true;if($('#save-state')) $('#save-state').textContent = 'В памяти · скачайте JSON';message('Браузер не разрешил сохранение: '+saved.error+' Скачивайте JSON перед закрытием страницы.',true);}
