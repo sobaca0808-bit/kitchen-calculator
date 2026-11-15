@@ -19,7 +19,7 @@
   let draft = null, dirty = false, isNew = false, errors = new Map(), invalidValues = new Map(), storageBlocked = !!loaded.error;
   const editor = $('#editor');
   let packagingEditor = null;
-  let photoEditor = null, photoPreview = null, draftTimer = null, draftStatus = '', restoring = false;
+  let photoEditor = null, photoPreview = null, draftTimer = null, draftStatus = '', restoring = false, draftProvenance = null;
   const unusedPhotos = new Set();
   const isCatalog = () => section === 'products' || section === 'packaging';
   const editingRecipe = () => draft && !isCatalog() && !(section === 'dish' && viewing);
@@ -75,6 +75,7 @@
     if (!editingRecipe() || !dirty) return true;
     const record = {
       id:draft.id,type:section,isNew,data:clone(draft),updatedAt:Date.now(),
+      ...(draftProvenance?{recoverySource:draftProvenance}:{}),
       invalidValues:[...invalidValues],errors:[...errors],
       formValues:[...editor.querySelectorAll('input[id],select[id],textarea[id]')].filter(el=>el.type!=='file' && !el.readOnly).map(el=>({id:el.id,value:el.value,...(el.type==='checkbox'?{checked:el.checked}:{})})),
       details:[...editor.querySelectorAll('details')].map((el,index)=>({index,open:el.open}))
@@ -102,7 +103,7 @@
     if (result.error || !record) { message('Черновик недоступен. '+(result.error||''),true);return; }
     try {
       clearTimeout(draftTimer); section=type;selectedId=id;viewing=false;
-      draft=clone(record.data);isNew=record.isNew || !state.recipes.some(r=>r.id===id);dirty=true;
+      draft=clone(record.data);draftProvenance=record.recoverySource||null;isNew=record.isNew || !state.recipes.some(r=>r.id===id);dirty=true;
       errors=new Map(record.errors);invalidValues=new Map(record.invalidValues);draftStatus='Черновик восстановлен · нажмите «Сохранить» для изменения карточки';
       $('#library-search').value='';restoring=true;renderLibrary();renderEditor();
       for (const field of record.formValues) {
@@ -194,6 +195,7 @@
     }));
   }
   function openSelected() {
+    draftProvenance=null;
     clearTimeout(draftTimer); draftTimer=null;draftStatus='';
     draft = clone(collection().find(item => item.id === selectedId) || null);
     viewing = section === 'dish'; viewPortions = draft?.portions || 1;
@@ -525,6 +527,7 @@
   }
   $('#create').addEventListener('click',() => {
     if(!canLeave()) return;
+    draftProvenance=null;
     draft = section === 'products' ? {id:uid('product'),name:'',aliases:'',price:null,packQuantity:1,unit:'kg',massPerPiece:null,gramsPerMl:null,note:''} : section === 'packaging' ? {id:uid('packaging'),name:'',price:null,packQuantity:1,unit:'pcs',note:''} : {id:uid(section),type:section,name:'',note:'',actualYield:null,ingredients:[]};
     clearTimeout(draftTimer);draftStatus='';
     viewing = false;selectedId = draft.id;dirty = true;isNew = true;errors.clear();invalidValues.clear();renderLibrary();renderEditor();markDirty();renderDrafts();$('#item-name').focus();
@@ -540,13 +543,16 @@
     if(backupBusy)return;
     if(photoEditor?.busy) {message('Дождитесь обработки фотографии перед экспортом.',true);return;}
     const hasUnfinishedRecipe=editingRecipe() && dirty;
-    if(dirty && (hasUnfinishedRecipe ? !flushDraft() : !saveDraft())) return;
+    const exportUncommitted=recoveryRequired&&dirty&&!editingRecipe();
+    if(exportUncommitted&&(!draft?.name?.trim()||errors.size)){message('Исправьте название и числовые поля перед экспортом незавершённой записи.',true);return;}
+    if(!exportUncommitted&&dirty && (hasUnfinishedRecipe ? !flushDraft() : !saveDraft())) return;
     backupBusy=true;$('#export').disabled=true;
     try {
-      const portable=await Photos.exportData(state);
+      const portable=await Photos.exportData(exportUncommitted?P.resolveLinks(S.validate(currentState())):state);
       const text = S.stringify(portable), url = URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
       const link = document.createElement('a');link.href = url;link.download = 'kitchen-calculator-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);
       message('JSON с сохранёнными карточками и фотографиями подготовлен к скачиванию.'+(hasUnfinishedRecipe?' Незавершённый черновик хранится отдельно: сначала нажмите «Сохранить», чтобы включить изменения в резервную копию.':''));
+      if(exportUncommitted)message('Изменения открытой записи включены только в скачиваемый JSON. Рабочая база в браузере не перезаписывалась.');
     } catch(e) {message('Экспорт не выполнен: '+e.message,true);}
     finally {backupBusy=false;$('#export').disabled=false;}
   });

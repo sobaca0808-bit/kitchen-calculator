@@ -32,6 +32,12 @@
         const c=source.counts;
         return `<article class="recovery-source"><h3>${esc(source.name)}</h3><code>${esc(source.key)}</code><p>${source.error?'<span class="inline-error">'+esc(source.error)+'</span>':source.raw===null?'Сохранённой базы нет.':`Продуктов: ${c.products} · Полуфабрикатов: ${c.prep} · Блюд: ${c.dish} · Упаковки: ${c.packaging}`}</p>${source.data?'<p class="field-help">Примеры рецептов: '+esc(source.data.recipes.slice(0,5).map(r=>r.name).join('; ')||'нет')+'</p>':''}<div class="recovery-actions"><button data-raw="${source.id}" ${typeof source.raw!=='string'?'disabled':''}>Скачать исходный JSON</button><button data-portable="${source.id}" ${!source.data?'disabled':''}>Скачать JSON с фото</button><button data-recover="${source.id}" ${!source.data?'disabled':''}>Восстановить эту базу</button></div><details><summary>Черновики: ${source.items.length}${source.draftError?' · ошибка':''}</summary><p>${source.draftError?esc(source.draftError):'Основная карточка не изменится при копировании черновика. Если такой черновик уже есть, создаётся отдельная копия.'}</p><button data-draft-raw="${source.id}" ${typeof source.draftRaw!=='string'?'disabled':''}>Скачать исходные черновики</button>${source.id==='legacy'?source.items.map(record=>`<div class="recovery-draft"><span>${esc(record.data.name||'Без названия')} · ${record.type==='prep'?'Полуфабрикат':'Блюдо'}</span><button data-copy-draft="${esc(record.id)}" data-type="${record.type}">Копировать черновик в рабочую версию</button></div>`).join(''):''}</details></article>`;
       }).join('');
+      sources.forEach((source,index)=>{
+        if(!source.data)return;
+        const text=document.createElement('p');text.className='field-help';
+        text.textContent='Примеры продуктов (цена упаковки): '+source.data.products.slice(0,3).map(product=>product.name+' — '+(product.price===null?'цена не указана':new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB'}).format(product.price))).join('; ');
+        list.children[index].insertBefore(text,list.children[index].querySelector('.recovery-actions'));
+      });
       list.querySelectorAll('[data-raw]').forEach(button=>button.onclick=()=>rawDownload(sources.find(s=>s.id===button.dataset.raw)));
       list.querySelectorAll('[data-draft-raw]').forEach(button=>button.onclick=()=>rawDownload(sources.find(s=>s.id===button.dataset.draftRaw),true));
       list.querySelectorAll('[data-portable]').forEach(button=>button.onclick=()=>run(async()=>{

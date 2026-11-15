@@ -252,6 +252,13 @@
     if (bytes > MAX_IMPORT_BYTES) fail('Резервная копия больше 50 МБ. Уменьшите число фотографий перед экспортом.');
     return source;
   }
+  function assertSupported(original,clean,path='база') {
+    if(!original||typeof original!=='object')return;
+    for(const key of Object.keys(original)) {
+      if(!clean||!Object.hasOwn(clean,key)) fail('Поле «'+path+'.'+key+'» не поддерживается этой версией. Скачайте исходный JSON; восстановление с потерей полей запрещено.');
+      if(original[key]&&typeof original[key]==='object')assertSupported(original[key],clean[key],path+'.'+key);
+    }
+  }
   function getStorage(explicit) {
     if (explicit !== undefined) return explicit;
     if (typeof globalThis.localStorage === 'undefined') fail('Локальное хранилище недоступно в этом браузере.');
@@ -261,7 +268,9 @@
     let source;
     try {
       source = getStorage(storage).getItem(KEY);
-      return { data: source === null ? null : parseJSON(source), error: null, source };
+      const data=source===null?null:parseJSON(source);
+      if(source!==null)assertSupported(JSON.parse(source),data);
+      return { data, error: null, source };
     } catch (error) {
       return { data: null, error: 'Не удалось загрузить сохранённые данные: ' + error.message + ' Исходная запись не изменена.', source };
     }
@@ -286,5 +295,5 @@
       return { ok: false, error: 'Не удалось сохранить данные: ' + error.message + ' Скачайте JSON, чтобы не потерять изменения.' };
     }
   }
-  return { KEY, MAX_IMPORT_BYTES, MAX_PHOTO_BYTES, MAX_PHOTO_SIDE, MAX_RECIPE_DEPTH, validate, parseJSON, stringify, snapshot, load, save };
+  return { KEY, MAX_IMPORT_BYTES, MAX_PHOTO_BYTES, MAX_PHOTO_SIDE, MAX_RECIPE_DEPTH, validate, parseJSON, stringify, assertSupported, snapshot, load, save };
 });

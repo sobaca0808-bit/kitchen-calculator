@@ -85,7 +85,7 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
 (async()=>{
  await fs.mkdir(out,{recursive:true});browser=await chromium.launch(launch);
  await test('old production alone is opened without initialization or legacy reads',{[KEY]:JSON.stringify(book('Старая кухня'))},{},async page=>{
-  const before=await raw(page);assert.equal(await page.locator('#count-products').innerText(),'12');assert.match(await page.locator('#storage-notice').innerText(),/сохранена/);await page.reload();assert.equal(await raw(page),before);assert((await page.evaluate(()=>window.__storageOps)).every(op=>op.method==='getItem'));
+  const before=await raw(page);assert.equal(await page.locator('#count-products').innerText(),'12');assert.match(await page.locator('#storage-notice').innerText(),/сохранена/);await page.reload();assert.equal(await raw(page),before);assert((await page.evaluate(()=>window.__storageOps)).every(op=>op.method==='getItem'&&[KEY,DRAFT].includes(op.key)));
  });
  await test('only legacy: active database stays absent; raw export and cancellation preserve it',{[LEGACY]:JSON.stringify(book('После релиза'))},{},async page=>{
   assert.equal(await raw(page),null);assert.equal(await page.locator('[data-open]').count(),0);assert.match(await page.locator('#storage-notice').innerText(),/отсутствует/);await inspect(page);
@@ -94,6 +94,7 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
  });
  await test('different nonempty sources show counts/names and can both be downloaded',{[KEY]:JSON.stringify(book('До релиза')),[LEGACY]:JSON.stringify(book('После релиза'))},{},async page=>{
   await inspect(page);assert.equal(await page.locator('.recovery-source').count(),2);assert.match(await page.locator('.recovery-source').first().innerText(),/Продуктов: 12.*Полуфабрикатов: 2.*Блюд: 1/);
+  assert.match(await page.locator('.recovery-source').first().innerText(),/До релиза.*240/);assert.match(await page.locator('.recovery-source').last().innerText(),/После релиза.*240/);
   assert.equal(await downloaded(page,page.locator('[data-raw=production]')),await raw(page));assert.equal(await downloaded(page,page.locator('[data-raw=legacy]')),await raw(page,LEGACY));
   await page.locator('[data-recover=legacy]').click();assert.match(await page.locator('#recovery-status').innerText(),/Подтвердите/);assert.equal(JSON.parse(await raw(page)).products[0].name,'До релиза');
   await page.screenshot({path:path.join(out,'sources-desktop.png'),fullPage:true});
@@ -116,6 +117,10 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
  await test('corrupt legacy does not prevent working with production and remains downloadable',{[KEY]:JSON.stringify(book()),[LEGACY]:'{broken legacy'},{},async page=>{
   await inspect(page);assert(await page.locator('[data-recover=legacy]').isDisabled());assert.equal(await downloaded(page,page.locator('[data-raw=legacy]')),'{broken legacy');assert.equal(JSON.parse(await raw(page)).products[0].price,240);
  });
+ await test('production recipes with old photo references can explicitly copy legacy assets without changing the test book',{[KEY]:JSON.stringify(photographed),[LEGACY]:JSON.stringify(book('Отдельный тест'))},{[LPHOTO]:['old-first','old-second']},async page=>{
+  const legacy=await raw(page,LEGACY);assert((await page.evaluate(()=>window.__dbOps)).every(op=>op.name!== 'kitchen-calculator-test-photos-v1'));await inspect(page);await choose(page,'production');assert.match(await page.locator('#recovery-status').innerText(),/восстановлена/);
+  const saved=JSON.parse(await raw(page));assert.notEqual(saved.recipes[2].photoIds[0],'old-first');assert.equal(saved.products[0].name,photographed.products[0].name);assert.equal(await raw(page,LEGACY),legacy);assert.equal(await databaseCount(page,PHOTO,'photos'),2);assert.equal(await databaseCount(page,LPHOTO,'photos'),2);
+ });
  await test('no keys: no demonstration base is written; an explicit product save survives reload',{}, {},async page=>{
   assert.equal(await raw(page),null);assert((await page.evaluate(()=>window.__storageOps)).every(op=>op.method==='getItem'));await page.locator('[data-tab=products]').click();await page.locator('#create').click();await page.locator('#item-name').fill('Первый настоящий продукт');await page.locator('#price').fill('321,45');await page.locator('#save-item').click();
   assert.match(await page.locator('#message').innerText(),/Сохранено/);const saved=await raw(page);assert.equal(JSON.parse(saved).products[0].price,321.45);await page.reload();assert.equal(await raw(page),saved);assert.equal(await raw(page,LEGACY),null);
@@ -127,6 +132,11 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
  await test('ordinary save quota preserves the old database and can export the in-memory changes',{[KEY]:JSON.stringify(book())},{},async page=>{
   const before=await raw(page);await page.locator('[data-tab=products]').click();await page.locator('#price').fill('999');await page.evaluate(()=>window.__blockMain=true);await page.locator('#save-item').click();assert.equal(await raw(page),before);assert.match(await page.locator('#save-state').innerText(),/В памяти/);
   const backup=JSON.parse(await downloaded(page,page.locator('#export')));assert.equal(backup.products[0].price,999);assert.equal(await raw(page),before);
+ });
+ await test('external production changes block stale saves but still allow exporting unsaved product input',{[KEY]:JSON.stringify(book())},{},async page=>{
+  await page.locator('[data-tab=products]').click();await page.locator('#price').fill('876,54');const other=JSON.stringify(book('Другая вкладка'));
+  await page.evaluate(({key,value})=>{window.__nativeWrite(key,value);dispatchEvent(new StorageEvent('storage',{key,newValue:value}));},{key:KEY,value:other});
+  await page.locator('#save-item').click();assert.equal(await raw(page),other);const copy=JSON.parse(await downloaded(page,page.locator('#export')));assert.equal(copy.products[0].price,876.54);assert.equal(await raw(page),other);
  });
  await test('backup quota prevents all replacement and photo staging',{[KEY]:JSON.stringify(book('Старая')),[LEGACY]:JSON.stringify(photographed)},{[LPHOTO]:['old-first','old-second']},async page=>{
   const before=await raw(page);await inspect(page);await page.evaluate(()=>window.__blockBackup=true);await choose(page);assert.match(await page.locator('#recovery-status').innerText(),/quota/i);assert.equal(await raw(page),before);assert.equal(await databaseCount(page,PHOTO,'photos'),0);assert.equal(await databaseCount(page,LPHOTO,'photos'),2);
@@ -153,6 +163,14 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
   const old=await raw(page),legacy=await raw(page,LEGACY);page.once('dialog',d=>d.accept());await page.locator('#import-file').setInputFiles({name:'old-v1.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(book('Из файла')))});
   await page.waitForFunction(()=>document.querySelector('#message').textContent.includes('Данные импортированы'));assert.equal(JSON.parse(await raw(page)).products[0].name,'Из файла');assert.equal(await raw(page,LEGACY),legacy);assert.equal(await databaseCount(page,PHOTO,'photos'),2);
   assert((await page.evaluate(()=>window.__storageOps)).every(op=>[KEY,DRAFT].includes(op.key)));await inspect(page);await page.locator('#recovery-backups-open').click();const restored=JSON.parse(await downloaded(page,page.locator('#recovery-backups button').filter({hasText:'Скачать JSON с фото из копии'})));assert.equal(restored.products[0].name,JSON.parse(old).products[0].name);assert.equal(restored.recipes[2].photos.filter(Boolean).length,2);
+ });
+ const conflicted=record('Старое незавершённое блюдо','dish-gyro');conflicted.isNew=false;conflicted.data={...book().recipes[2],name:conflicted.data.name};
+ const oldRow=conflicted.data.ingredients[0].id;conflicted.formValues=[{id:'item-name',value:conflicted.data.name},{id:'qty-'+oldRow,value:'1,2,3'}];conflicted.invalidValues=[['qty-'+oldRow,'1,2,3']];conflicted.errors=[['qty-'+oldRow,'Исправьте число']];
+ await test('a conflicting copied recipe restores invalid row input and saves beside the original without duplicate IDs',{[KEY]:JSON.stringify(book()),[LEGACY]:JSON.stringify(book()),[DRAFT]:envelope([conflicted]),[LDRAFT]:envelope([conflicted])},{},async page=>{
+  await inspect(page);await page.locator('.recovery-source').last().locator('summary').click();page.once('dialog',d=>d.accept());await page.locator('[data-copy-draft]').click();await page.waitForFunction(()=>document.querySelector('#storage-recovery').getAttribute('aria-busy')==='false');
+  const copied=JSON.parse(await raw(page,DRAFT)).items.find(r=>r.id!=='dish-gyro');assert(copied);const row=copied.data.ingredients[0].id;assert.notEqual(row,oldRow);await page.locator('#recovery-close').click();await page.locator(`[data-restore-draft="${copied.id}"]`).click();assert.equal(await page.locator('#qty-'+row).inputValue(),'1,2,3');
+  await page.locator('#qty-'+row).fill('101');await page.locator('#save-item').click();assert.match(await page.locator('#message').innerText(),/Сохранено/);let saved=JSON.parse(await raw(page));assert.equal(saved.recipes.length,4);assert.deepEqual(saved.recipes.find(r=>r.id==='dish-gyro'),book().recipes[2]);assert.equal(saved.recipes.find(r=>r.id===copied.id).ingredients[0].quantity,101);
+  await page.locator('#save-item').click();saved=JSON.parse(await raw(page));assert.equal(saved.recipes.filter(r=>r.id===copied.id).length,1);
  });
  await test('unknown future fields are downloadable but never silently discarded',{[KEY]:JSON.stringify(book()),[LEGACY]:JSON.stringify({...book('Будущая версия'),folders:[{id:'folder-a',name:'Ценное'}]})},{},async page=>{
   await inspect(page);assert.match(await page.locator('.recovery-source').last().innerText(),/не поддерживается/);assert(await page.locator('[data-recover=legacy]').isDisabled());assert.deepEqual(JSON.parse(await downloaded(page,page.locator('[data-raw=legacy]'))).folders,[{id:'folder-a',name:'Ценное'}]);
@@ -186,17 +204,22 @@ async function photoBytes(page,id){return page.evaluate(async id=>Array.from(new
  await browser.close();browser=null;
  // Real browser process shutdown/restart, not just page.reload().
  const profile=await fs.mkdtemp(path.join(os.tmpdir(),'kitchen-production-restart-'));
+ const restartErrors=[];
+ async function watchRestart(context){
+  await context.route('**/favicon.ico',route=>route.fulfill({status:204,body:''}));
+  context.on('page',page=>{page.on('pageerror',error=>restartErrors.push(error.message));page.on('console',message=>{if(message.type()==='error')restartErrors.push(message.text());});});
+ }
  let persistent;
  try{
-  persistent=await chromium.launchPersistentContext(profile,{...launch,viewport:{width:390,height:844},acceptDownloads:true});await seed(persistent,{[KEY]:JSON.stringify(book('До обновления')),[LEGACY]:JSON.stringify(photographed)},{[LPHOTO]:['old-first','old-second']});await guards(persistent);
+  persistent=await chromium.launchPersistentContext(profile,{...launch,viewport:{width:390,height:844},acceptDownloads:true});await watchRestart(persistent);await seed(persistent,{[KEY]:JSON.stringify(book('До обновления')),[LEGACY]:JSON.stringify(photographed)},{[LPHOTO]:['old-first','old-second']});await guards(persistent);
   let page=await persistent.newPage();page.setDefaultTimeout(15000);await page.goto(URL);const before=await raw(page);assert.equal(JSON.parse(before).products[0].name,'До обновления');assert.equal(await raw(page,LEGACY),JSON.stringify(photographed));await inspect(page);await choose(page);
   await page.locator('#recovery-close').click();await page.locator('[data-tab=products]').click();await page.locator('#price').fill('654,32');await page.locator('#save-item').click();
   await page.locator('[data-tab=dish]').click();await page.locator('#create').click();await page.locator('#item-name').fill('Черновик до закрытия');await page.waitForFunction(()=>KitchenDrafts.load().items.some(r=>r.data.name==='Черновик до закрытия'));
   const saved=await raw(page),draftRaw=await raw(page,DRAFT),ids=JSON.parse(saved).recipes[2].photoIds,bytes=await photoBytes(page,ids[0]);await persistent.close();
-  persistent=await chromium.launchPersistentContext(profile,{...launch,viewport:{width:390,height:844},acceptDownloads:true});await guards(persistent);page=await persistent.newPage();await page.goto(URL);
+  persistent=await chromium.launchPersistentContext(profile,{...launch,viewport:{width:390,height:844},acceptDownloads:true});await watchRestart(persistent);await guards(persistent);page=await persistent.newPage();await page.goto(URL);
   assert.equal(await raw(page),saved);assert.equal(await raw(page,DRAFT),draftRaw);assert.equal(JSON.parse(saved).products[0].price,654.32);assert.deepEqual(await photoBytes(page,ids[0]),bytes);assert.equal(await page.locator('#drafts-panel [data-restore-draft]').count(),1);
   await page.locator('#drafts-panel [data-restore-draft]').click();assert.equal(await page.locator('#item-name').inputValue(),'Черновик до закрытия');
-  console.log('PASS recovery: real browser restart retains the updated production book, price, photographs and draft');passed++;proof.push({name:'real browser restart after version update',passed:true});
+  assert.deepEqual(restartErrors,[]);console.log('PASS recovery: real browser restart retains the updated production book, price, photographs and draft');passed++;proof.push({name:'real browser restart after version update',passed:true,consoleErrors:restartErrors});
  }catch(error){console.error('FAIL recovery: real restart',error.stack);failures.push('real restart: '+error.message);}
  finally{await persistent?.close();await fs.rm(profile,{recursive:true,force:true});}
  await fs.writeFile(path.join(out,'storage-recovery-proof.json'),JSON.stringify(proof,null,2)+'\n');console.log(`${passed} storage-recovery browser scenarios passed; ${failures.length} failures.`);if(failures.length)process.exitCode=1;

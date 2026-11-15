@@ -115,3 +115,20 @@ test('a conflicting production draft is retained and the copied draft receives a
 test('invalid draft JSON does not get cleared or prevent exporting its raw bytes',()=>{
  const env=setup([[R.LEGACY_DRAFT_KEY,'{broken drafts']]),source=R.inspect(env.storage)[1];assert(source.draftError);assert.equal(source.draftRaw,'{broken drafts');assert.equal(env.storage.values.get(R.LEGACY_DRAFT_KEY),source.draftRaw);
 });
+test('a conflicting copied draft remaps row and field IDs and can be saved beside the original recipe',async()=>{
+ const state=book(),recipe=state.recipes[2],original=draft('Сборка после релиза',recipe.id);original.data=clone(recipe);original.data.name='Сборка после релиза';
+ original.formValues=[{id:'qty-'+recipe.ingredients[0].id,value:'1,2,3'}];original.invalidValues=[[original.formValues[0].id,'1,2,3']];original.errors=[[original.formValues[0].id,'Исправьте число']];
+ const env=setup([[S.KEY,S.stringify(state)],[D.KEY,drafts(original)],[R.LEGACY_DRAFT_KEY,drafts(original)]]),sources=R.inspect(env.storage);
+ await R.copyDraft(sources[1],recipe.id,'dish',sources,env.options);const copied=D.load(env.storage).items.find(r=>r.id!==recipe.id);
+ assert(copied);assert.notEqual(copied.data.ingredients[0].id,recipe.ingredients[0].id);assert.equal(copied.formValues[0].id,'qty-'+copied.data.ingredients[0].id);assert.equal(copied.invalidValues[0][0],copied.formValues[0].id);
+ assert.equal(copied.invalidValues[0][1],'1,2,3');state.recipes.push(copied.data);assert.doesNotThrow(()=>S.validate(state));
+});
+test('a legacy draft cannot silently target a different saved production recipe with the same ID',async()=>{
+ const state=book(),recipe=state.recipes[2],original=draft('Не заменять чужое',recipe.id);original.isNew=false;
+ const env=setup([[S.KEY,S.stringify(state)],[R.LEGACY_DRAFT_KEY,drafts(original)]]),sources=R.inspect(env.storage);
+ const result=await R.copyDraft(sources[1],recipe.id,'dish',sources,env.options);assert.notEqual(result.id,recipe.id);assert.equal(D.load(env.storage).items[0].isNew,true);assert.deepEqual(S.load(env.storage).data,state);
+});
+test('a future production schema is blocked on load before an editor can drop its fields',()=>{
+ const raw=JSON.stringify({...book(),folders:[{id:'future',name:'Сохранить категорию'}]}),storage=memory([[S.KEY,raw]]),loaded=S.snapshot(storage);
+ assert.equal(loaded.source,raw);assert.equal(loaded.data,null);assert.match(loaded.error,/folders/);assert.equal(storage.values.get(S.KEY),raw);assert(storage.ops.every(op=>op[0]==='get'));
+});

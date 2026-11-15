@@ -1,8 +1,8 @@
 (function(root,factory){
   const node=typeof module==='object'&&module.exports;
-  const api=factory(root,node?require('./storage.js'):root.KitchenStorage,node?require('./drafts.js'):root.KitchenDrafts,node?require('./photos.js'):root.KitchenPhotos);
+  const api=factory(root,node?require('./storage.js'):root.KitchenStorage,node?require('./drafts.js'):root.KitchenDrafts,node?require('./photos.js'):root.KitchenPhotos,node?require('./packaging.js'):root.KitchenPackaging);
   if(node)module.exports=api;else root.KitchenStorageRecovery=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function(root,S,D,Photos){
+})(typeof globalThis!=='undefined'?globalThis:this,function(root,S,D,Photos,P){
   'use strict';
   const LEGACY_KEY='kitchen-calculator-pr2-browser-test-v1';
   const LEGACY_DRAFT_KEY='kitchen-calculator-pr2-browser-drafts-v1';
@@ -15,13 +15,7 @@
   const clone=value=>JSON.parse(JSON.stringify(value));
   const storageOf=storage=>storage===undefined?root.localStorage:storage;
   const uid=prefix=>prefix+'-'+root.crypto.randomUUID();
-  function assertSupported(original,clean,path='база'){
-    if(!original||typeof original!=='object')return;
-    for(const key of Object.keys(original)){
-      if(!Object.hasOwn(clean,key))throw Error('Поле «'+path+'.'+key+'» не поддерживается этой версией. Скачайте исходный JSON; восстановление с потерей полей запрещено.');
-      if(original[key]&&typeof original[key]==='object')assertSupported(original[key],clean[key],path+'.'+key);
-    }
-  }
+  const assertSupported=S.assertSupported;
   // No legacy key is read until the user opens recovery. Normal operations use S/D.
   function inspect(storage,includeLegacy=true){
     return SOURCES.slice(0,includeLegacy?2:1).map(meta=>{
@@ -30,8 +24,9 @@
         const target=storageOf(storage);source.raw=target.getItem(meta.key);source.draftRaw=target.getItem(meta.draftKey);
         if(source.raw!==null){
           try{
-            source.data=S.parseJSON(source.raw);assertSupported(JSON.parse(source.raw),source.data);
+            source.data=S.parseJSON(source.raw);
             source.counts={products:source.data.products.length,prep:source.data.recipes.filter(r=>r.type==='prep').length,dish:source.data.recipes.filter(r=>r.type==='dish').length,packaging:(source.data.packaging||[]).length};
+            assertSupported(JSON.parse(source.raw),source.data);
           }catch(error){source.error=error.message;source.data=null;}
         }
         const drafts=D.load({getItem:()=>source.draftRaw});source.items=drafts.items;source.draftError=drafts.error;
@@ -97,7 +92,8 @@
     if(options.confirmed!==true)throw Error('Восстановление требует явного подтверждения.');
     const photos=options.photos||Photos,target=storageOf(options.storage),current=sources.find(s=>s.key===S.KEY);
     if(!current)throw Error('Нет снимка рабочей базы.');
-    const clean=S.validate(candidate);assertSupported(candidate,clean);unchanged(sources,target);
+    // Same existing import boundary as app.persist; preserve packaging identities.
+    const clean=P.resolveLinks(S.validate(candidate));assertSupported(candidate,clean);unchanged(sources,target);
     // Identical repeated restoration neither stages photos nor creates duplicates/backups.
     if(current.data){
       try{if(S.stringify(await photos.exportData(current.data))===S.stringify(clean))return {changed:false,data:current.data,source:current.raw};}catch(_){}
@@ -129,9 +125,23 @@
     const current=D.load(options.storage);if(current.error)throw Error(current.error);
     if(current.items.some(r=>r.recoverySource===tag))return {changed:false};
     const record=clone(original);record.recoverySource=tag;
-    if(current.items.some(r=>r.id===id&&r.type===type)){
+    const ownRecipe=sources.find(s=>s.key===S.KEY)?.data?.recipes.find(r=>r.id===id),oldRecipe=source.data?.recipes.find(r=>r.id===id);
+    const withoutPhotos=recipe=>{const value=clone(recipe);for(const key of ['photoId','photoIds','photo','photos'])delete value[key];return JSON.stringify(value);};
+    if(current.items.some(r=>r.id===id&&r.type===type)||ownRecipe&&(!oldRecipe||withoutPhotos(ownRecipe)!==withoutPhotos(oldRecipe))){
       record.id=uid('recovered-draft');record.data.id=record.id;record.isNew=true;
     }
+    // Row IDs are globally unique in the saved book. A copied draft must remain
+    // saveable alongside the original recipe, including its raw invalid input.
+    const rowIds=new Map();
+    for(const row of [...record.data.ingredients,...(record.data.packaging||[])])if(typeof row.id==='string'){
+      const next=uid('recovered-row');rowIds.set(row.id,next);row.id=next;
+    }
+    const fieldId=value=>{
+      for(const [old,next]of [...rowIds].sort((a,b)=>b[0].length-a[0].length))if(value===old||value.endsWith('-'+old))return value.slice(0,value.length-old.length)+next;
+      return value;
+    };
+    for(const field of record.formValues)field.id=fieldId(field.id);
+    for(const field of ['invalidValues','errors'])for(const entry of record[field])entry[0]=fieldId(entry[0]);
     const photos=options.photos||Photos,values=photos.ids(original.data);
     let prepared;
     const snapshot=await archive(sources,options);

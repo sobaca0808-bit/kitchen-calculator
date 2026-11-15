@@ -141,6 +141,9 @@ async function photoInfo(page,id){return page.evaluate(async id=>{const p=await 
   });
   await test('quota during second imported photo rolls back only staged IDs',async page=>{
    await edit(page);await upload(page,0,await picture(page));await upload(page,1,await picture(page,{color:'#643829'}));await save(page);const before=await stored(page),backup=await exportJSON(page),count=await idbCount(page);
+   // Identical backups are now an intentional no-op. Change the candidate so the
+   // existing second-image quota assertions still exercise a real staged import.
+   backup.recipes[0].name+=' — изменённая резервная копия';
    await page.evaluate(()=>{const original=IDBObjectStore.prototype.add;let writes=0;IDBObjectStore.prototype.add=function(...args){if(this.name==='photos'&&++writes===2)throw new DOMException('Fictional second image quota','QuotaExceededError');return original.apply(this,args);};});await importJSON(page,backup);await page.waitForFunction(()=>document.querySelector('#message')?.textContent.includes('Импорт отменён'));assert.deepEqual(await stored(page),before);assert.equal(await idbCount(page),count);for(const id of before.recipes[0].photoIds)assert((await photoInfo(page,id)).bytes>0);
   });
   await test('old one-photo JSON and local recipes remain readable without eager migration',async page=>{
