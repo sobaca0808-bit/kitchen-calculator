@@ -4,7 +4,7 @@
   else root.KitchenPhotos = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (S) {
   'use strict';
-  const DB_NAME = 'kitchen-calculator-test-photos-v1';
+  const DB_NAME = 'kitchen-calculator-photos-v1';
   const STORE = 'photos';
   const MAX_SOURCE_BYTES = 10 * 1024 * 1024, MAX_PIXELS = 40 * 1000 * 1000;
   const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
