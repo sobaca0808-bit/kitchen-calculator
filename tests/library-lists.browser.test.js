@@ -3,9 +3,9 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const TEST_KEY = 'kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
-const PRODUCTION_KEY = 'kitchen-calculator-v1';
+const TEST_KEY = 'kitchen-calculator-v1';
+const DRAFT_KEY = 'kitchen-calculator-drafts-v1';
+const PRODUCTION_KEY = 'kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL = '{"fictional":"issue-6-production-placeholder"}';
 const testURL = process.env.KITCHEN_TEST_URL;
 if (!testURL) throw Error('KITCHEN_TEST_URL must point to a disposable loopback server.');
@@ -34,7 +34,7 @@ const stored = page => page.evaluate(key=>JSON.parse(localStorage.getItem(key)),
 const row = (page,type,number)=>page.locator(`[data-open="${id(type,number)}"]`);
 async function guard(page) {
   assert.equal(await page.evaluate(()=>KitchenStorage.KEY),TEST_KEY);
-  assert.match(await page.locator('.test-notice').innerText(),/ТЕСТ/);
+  assert.match(await page.locator('.test-notice').innerText(),/Рабочий калькулятор/);
 }
 async function isolation(page, expectSentinel = true) {
   const proof = await page.evaluate(key=>({ops:window.__issue6StorageOps.slice(),sentinel:window.__readIssue6Sentinel(key)}),PRODUCTION_KEY);

@@ -8,7 +8,7 @@ const testURL=process.env.KITCHEN_TEST_URL;
 if(!testURL)throw Error('KITCHEN_TEST_URL must identify the disposable loopback server.');
 const target=new URL(testURL);
 if(!['http:','https:'].includes(target.protocol)||!['127.0.0.1','localhost','[::1]'].includes(target.hostname))throw Error('Two-photo checks never run on a published site.');
-const KEY='kitchen-calculator-pr2-browser-test-v1',DRAFT='kitchen-calculator-pr2-browser-drafts-v1',PRODUCTION='kitchen-calculator-v1';
+const KEY='kitchen-calculator-v1',DRAFT='kitchen-calculator-drafts-v1',PRODUCTION='kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL='{"fictional":"two-photo-protected-production-placeholder"}';
 const output=process.env.KITCHEN_TEST_ARTIFACT_DIR||path.join(require('node:os').tmpdir(),'kitchen-two-photo-artifacts');
 function fixture(){return {version:1,products:[{id:'rice',name:'Рис — тестовый продукт',aliases:'',price:100,packQuantity:1,unit:'kg',massPerPiece:null,gramsPerMl:null,note:''}],packaging:[{id:'box',name:'Контейнер',price:500,packQuantity:50,unit:'pcs',note:''}],recipes:[{id:'dish',type:'dish',name:'Рис с овощами · два эталона подачи',portions:2,actualYield:400,technology:'1. Промыть рис и отварить.\n2. Добавить подготовленные овощи.\n3. Разложить и подать горячим.',note:'Вымышленные данные для проверки двух фотографий.',ingredients:[{id:'rice-row',refId:'rice',quantity:200,unit:'g',lossPercent:null,outputGrams:null,note:''}],packaging:[{id:'box-row',refId:'box',quantity:1,unit:'pcs',freeForGuest:true,costMode:'auto'}]}]};}

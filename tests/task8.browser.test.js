@@ -3,9 +3,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const {chromium} = require('playwright');
-const TEST_KEY = 'kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
-const PRODUCTION_KEY = 'kitchen-calculator-v1';
+const TEST_KEY = 'kitchen-calculator-v1';
+const DRAFT_KEY = 'kitchen-calculator-drafts-v1';
+const PRODUCTION_KEY = 'kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL = '{"fictional":"task-8-production-placeholder"}';
 const testURL = process.env.KITCHEN_TEST_URL;
 if (!testURL) throw Error('KITCHEN_TEST_URL must point to an isolated loopback server.');

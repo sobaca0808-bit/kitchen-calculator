@@ -4,7 +4,7 @@
   else root.KitchenPhotos = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (S) {
   'use strict';
-  const DB_NAME = 'kitchen-calculator-test-photos-v1';
+  const DB_NAME = 'kitchen-calculator-photos-v1';
   const STORE = 'photos';
   const MAX_SOURCE_BYTES = 10 * 1024 * 1024, MAX_PIXELS = 40 * 1000 * 1000;
   const MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -181,19 +181,19 @@
       if(image.naturalWidth!==record.width || image.naturalHeight!==record.height || Math.max(record.width,record.height)>S.MAX_PHOTO_SIDE)throw Error('Размер фотографии не соответствует данным резервной копии.');
     } finally {image.src='';}
   }
-  async function portablePhoto(id) {
-    const record=await get(id);await validateBlob(record);
+  async function portablePhoto(id, reader = get) {
+    const record=await reader(id);await validateBlob(record);
     return {dataUrl:await readDataURL(record.blob),width:record.width,height:record.height,mime:record.mime};
   }
-  async function exportData(state) {
+  async function exportData(state, reader = get) {
     const data=S.validate(state);
     for(const recipe of data.recipes) {
       if(recipe.photoIds !== undefined) {
         recipe.photos=[];
-        for(const id of recipe.photoIds)recipe.photos.push(id ? await portablePhoto(id) : null);
+        for(const id of recipe.photoIds)recipe.photos.push(id ? await portablePhoto(id,reader) : null);
         delete recipe.photoIds;
       } else if(recipe.photoId) {
-        recipe.photo=await portablePhoto(recipe.photoId);delete recipe.photoId;
+        recipe.photo=await portablePhoto(recipe.photoId,reader);delete recipe.photoId;
       }
     }
     // Apply the same portable-file budget as import, so every export can be restored.
@@ -330,5 +330,5 @@
     const ready=Promise.all(slots.map((_,index)=>draw(index)));
     return {get busy(){return anyBusy();},ready,dispose(){disposed=true;slots.forEach(slot=>{slot.version++;if(slot.url)URL.revokeObjectURL(slot.url);});}};
   }
-  return {DB_NAME,MAX_SOURCE_BYTES,MAX_PIXELS,ids,printSlots,compress,get,remove,exportData,prepareImport,rollback,mountEditor,mountPreview,mountGallery};
+  return {DB_NAME,MAX_SOURCE_BYTES,MAX_PIXELS,ids,printSlots,compress,get,remove,portablePhoto,exportData,prepareImport,rollback,mountEditor,mountPreview,mountGallery};
 });

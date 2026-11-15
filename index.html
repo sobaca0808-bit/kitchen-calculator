@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#24634d">
   <title>Кухонный калькулятор</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="assets/storage-recovery.css">
   <script defer src="js/calculations.js"></script>
   <script defer src="js/seed.js"></script>
   <script defer src="js/storage.js"></script>
@@ -17,15 +18,28 @@
   <script defer src="js/drafts.js"></script>
   <script defer src="js/photo-viewer.js"></script>
   <script defer src="js/photos.js"></script>
+  <script defer src="js/storage-recovery.js"></script>
+  <script defer src="js/storage-recovery-ui.js"></script>
   <script defer src="js/app.js"></script>
 </head>
 <body>
-  <p class="test-notice" role="note">ТЕСТ PR №2 · Отдельное хранилище. Рабочие продукты и рецепты здесь не используются.</p>
+  <p class="test-notice" role="note">Рабочий калькулятор · Данные хранятся только в этом браузере и не загружаются с GitHub или из облака.</p>
   <header class="app-header">
     <a class="brand" href="index.html" aria-label="Кухонный калькулятор, главная"><span class="brand-icon" aria-hidden="true">К</span><span>Кухонный <b>калькулятор</b><small>Себестоимость начинается с продуктов</small></span></a>
-    <div class="backup-actions"><button id="export" class="quiet">↓ Экспорт JSON</button><button id="import" class="quiet">↑ Импорт JSON</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
+    <div class="backup-actions"><button id="storage-recovery-open" class="quiet" aria-expanded="false" aria-controls="storage-recovery">Восстановление данных</button><button id="export" class="quiet">↓ Экспорт JSON</button><button id="import" class="quiet">↑ Импорт JSON</button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
   </header>
   <div id="message" role="status" aria-live="polite" hidden></div>
+  <p id="storage-notice" class="storage-notice" role="status" aria-live="polite"></p>
+  <section id="storage-recovery" class="storage-recovery" aria-labelledby="recovery-title" hidden>
+    <h2 id="recovery-title" tabindex="-1">Безопасное восстановление данных</h2>
+    <p>После ошибочного релиза рабочие данные могли попасть в общее хранилище тестового сайта. В нём могут быть и тестовые рецепты. Сравните количество и названия, скачайте обе версии перед выбором. Ничего не объединяется и не переносится автоматически.</p>
+    <p>База привязана к этому браузеру, профилю и адресу сайта. В другом браузере, приватном режиме или после очистки данные могут быть недоступны. JSON с Google Drive или другого диска нужно выбрать вручную через «Импорт JSON».</p>
+    <div class="recovery-panel-actions"><button id="recovery-refresh">Обновить список</button><button id="recovery-backups-open">Резервные копии перед заменой</button><button id="recovery-close">Закрыть</button></div>
+    <label class="recovery-ack"><input id="recovery-ack" type="checkbox"><span>Я проверил источник. Понимаю, что общая база может содержать тестовые данные, и выбираю восстановление вручную.</span></label>
+    <p id="recovery-status" class="recovery-status" role="status" aria-live="polite"></p>
+    <div id="recovery-sources"></div>
+    <div id="recovery-backups" hidden></div>
+  </section>
   <nav class="tabs" aria-label="Разделы"><button data-tab="dish">Мои рецепты <span id="count-dish"></span></button><button data-tab="prep">Полуфабрикаты <span id="count-prep"></span></button><button data-tab="products">Продукты <span id="count-products"></span></button><button data-tab="packaging">Упаковка и фасовка <span id="count-packaging"></span></button></nav>
   <section id="drafts-panel" class="drafts-panel" aria-label="Восстановление черновиков" hidden></section>
   <main class="workspace">

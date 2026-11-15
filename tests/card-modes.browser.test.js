@@ -10,7 +10,7 @@ const testURL=process.env.KITCHEN_TEST_URL;
 if(!testURL)throw Error('KITCHEN_TEST_URL must point to a disposable loopback server.');
 const target=new URL(testURL);
 if(!['http:','https:'].includes(target.protocol)||!['127.0.0.1','localhost','[::1]'].includes(target.hostname))throw Error('Card-mode checks run only on loopback, never a published calculator.');
-const KEY='kitchen-calculator-pr2-browser-test-v1',DRAFT='kitchen-calculator-pr2-browser-drafts-v1',PRODUCTION='kitchen-calculator-v1';
+const KEY='kitchen-calculator-v1',DRAFT='kitchen-calculator-drafts-v1',PRODUCTION='kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL='{"fictional":"card-modes-protected-production-placeholder"}';
 const output=process.env.KITCHEN_TEST_ARTIFACT_DIR||path.join(os.tmpdir(),'kitchen-card-modes-artifacts');
 const pdfRoot=path.join(os.tmpdir(),'kitchen-card-modes-pdfs');
