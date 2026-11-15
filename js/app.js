@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const C = KitchenCalc, S = KitchenStorage, P = KitchenPackaging, D = KitchenDrafts, Photos = KitchenPhotos;
+  const C = KitchenCalc, S = KitchenStorage, F = KitchenFolders, P = KitchenPackaging, D = KitchenDrafts, Photos = KitchenPhotos;
   const $ = (selector, scope = document) => scope.querySelector(selector);
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -9,13 +9,16 @@
   const num = (n, digits = 3) => n == null ? '' : new Intl.NumberFormat('ru-RU',{maximumFractionDigits:digits,useGrouping:false}).format(n);
   const unitOptions = selected => Object.entries(C.units).map(([value,u]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${u.label}</option>`).join('');
   const loaded = S.load();
-  let state = loaded.data || (loaded.error ? {version:1,products:[],recipes:[]} : KitchenSeed.create());
+  let state = loaded.data || {version:1,products:[],recipes:[],packaging:[],folders:[]};
   let recoveryRequired = !!loaded.error;
   let section = 'dish', selectedId = state.recipes.find(r => r.type === 'dish')?.id || null;
   let viewing = true, viewPortions = 1, cardMode = 'calculation';
+  let folderFilter = 'all', folderFormId = null;
+  const selectedFolderId = () => folderFilter.startsWith('folder:') ? folderFilter.slice(7) : null;
   const printPhotoChoices = {chef:'both',calculation:'both'};
   let draft = null, dirty = false, isNew = false, errors = new Map(), invalidValues = new Map(), storageBlocked = !!loaded.error;
   const editor = $('#editor');
+  KitchenEditorActions.mount(editor);
   let packagingEditor = null;
   let photoEditor = null, photoPreview = null, draftTimer = null, draftStatus = '', restoring = false;
   const unusedPhotos = new Set();
@@ -38,6 +41,61 @@
     return true;
   }
   function collection() { return isCatalog() ? (state[section] || []) : state.recipes.filter(r => r.type === section); }
+  function folderOptions(selected = '') {
+    return '<option value="">Без папки</option>' + (state.folders || []).map(folder=>`<option value="${esc(folder.id)}" ${folder.id === selected ? 'selected' : ''}>${esc(folder.name)}</option>`).join('');
+  }
+  function folderActionAllowed() {
+    if(backupBusy || photoEditor?.busy) {message('Дождитесь завершения обработки фотографии или резервной копии.',true);return false;}
+    if(recoveryRequired || storageBlocked) {message('Операция с папкой недоступна: основная база не сохранена в браузере. Сначала сохраните данные или восстановите их через импорт JSON.',true);return false;}
+    return true;
+  }
+  function persistFolders(candidate, success) {
+    if(!folderActionAllowed()) return false;
+    let clean;
+    try {
+      const latest = S.load();
+      if(latest.error || !latest.data || S.stringify(latest.data) !== S.stringify(state)) {
+        message('База в браузере изменилась или недоступна. Операция с папкой отменена, чтобы не перезаписать другие изменения. Сохраните текущую работу в черновик и обновите страницу.',true);return false;
+      }
+      clean = S.validate(candidate);
+    } catch(error) {message(error.message,true);return false;}
+    const result = S.save(clean);
+    if(!result.ok) {message('Изменения папок не сохранены: '+result.error+' Прежняя база и рецепты не изменены.',true);return false;}
+    state = clean;message(success);return true;
+  }
+  // Update just the folder fields: raw input, photo work and other draft fields stay intact.
+  function refreshFolderFields() {
+    const detached = draft?.type === 'dish' && draft.folderId && !(state.folders || []).some(folder=>folder.id === draft.folderId);
+    if(detached) delete draft.folderId;
+    const field = $('#recipe-folder');
+    if(field) {field.innerHTML = folderOptions(draft?.folderId);field.value = draft?.folderId || '';}
+    const move = $('#move-folder');
+    if(move) {move.innerHTML = folderOptions(draft?.folderId);move.value = draft?.folderId || '';$('#move-recipe').disabled = true;}
+    if(detached && editingRecipe()) markDirty();
+  }
+  function renderFolders(query) {
+    const host = $('#folder-tools');host.hidden = section !== 'dish';
+    $('#library-search').placeholder = section === 'dish' ? 'Найти во всех блюдах…' : 'Найти в разделе…';
+    if(section !== 'dish') {$('#folder-form').hidden = true;folderFormId = null;return;}
+    const folders = state.folders || [], counts = new Map();let total = 0, unfiled = 0;
+    for(const recipe of state.recipes) if(recipe.type === 'dish') {
+      total++;if(recipe.folderId) counts.set(recipe.folderId,(counts.get(recipe.folderId) || 0)+1);else unfiled++;
+    }
+    if(!['all','unfiled'].includes(folderFilter) && !folders.some(folder=>folder.id === selectedFolderId())) folderFilter = 'all';
+    $('#folder-filter').innerHTML = `<option value="all">Все блюда (${total})</option><option value="unfiled">Без папки (${unfiled})</option>` + folders.map(folder=>`<option value="folder:${esc(folder.id)}">${esc(folder.name)} (${counts.get(folder.id) || 0})</option>`).join('');
+    $('#folder-filter').value = folderFilter;
+    const selected = folders.some(folder=>folder.id === selectedFolderId());
+    $('#folder-rename').disabled = !selected;$('#folder-delete').disabled = !selected;
+    const hint = $('#folder-search-status');hint.hidden = !query;
+    hint.textContent = query ? 'Поиск по всем блюдам. Очистите поиск, чтобы вернуться к выбранной папке.' : '';
+  }
+  function showFolderForm(id = null) {
+    if(!folderActionAllowed()) return;
+    folderFormId = id;
+    $('#folder-form').hidden = false;$('#folder-error').hidden = true;
+    $('#folder-name').value = id ? (state.folders || []).find(folder=>folder.id === id)?.name || '' : '';
+    $('#folder-submit').textContent = id ? 'Сохранить имя' : 'Создать';$('#folder-name').focus();
+  }
   function currentState() {
     const next = clone(state);
     if (draft) {
@@ -93,14 +151,22 @@
     if (!canLeave()) return;
     const result = D.load(), record = result.items.find(r=>r.id===id && r.type===type);
     if (result.error || !record) { message('Черновик недоступен. '+(result.error||''),true);return; }
+    const owner=[...state.products,...(state.packaging||[]),...(state.folders||[]),...state.recipes,...state.recipes.flatMap(recipe=>[...recipe.ingredients,...(recipe.packaging||[])])].find(item=>item.id===id);
+    if(owner && (!state.recipes.includes(owner) || owner.type!==type)) {
+      message('Черновик не открыт: после переноса его ID занят записью другого типа. Черновик и сохранённая база не изменены. Для восстановления используйте копию базы до импорта.',true);return;
+    }
+    if(owner && record.isNew && !confirm('Этот черновик создавался как новый рецепт, но в базе уже есть запись с тем же ID. Восстановить для редактирования? Последующее нажатие «Сохранить» заменит её содержимое.'))return;
     try {
       clearTimeout(draftTimer); section=type;selectedId=id;viewing=false;
       draft=clone(record.data);isNew=record.isNew || !state.recipes.some(r=>r.id===id);dirty=true;
+      const missingFolder = type === 'dish' && draft.folderId && !(state.folders || []).some(folder=>folder.id === draft.folderId);
+      if(missingFolder) delete draft.folderId;
       errors=new Map(record.errors);invalidValues=new Map(record.invalidValues);draftStatus='Черновик восстановлен · нажмите «Сохранить» для изменения карточки';
       $('#library-search').value='';restoring=true;renderLibrary();renderEditor();
       for (const field of record.formValues) {
         const el=document.getElementById(field.id);
         if (!el || !editor.contains(el) || el.type==='file' || el.readOnly) continue;
+        if(field.id === 'recipe-folder') continue; // The recipe data is authoritative, including deleted-folder recovery.
         el.value=field.value;if(el.type==='checkbox')el.checked=field.checked;
         // The packaging module keeps invalid raw values separately from its recipe data.
         if (field.id.startsWith('pack-qty-')) el.dispatchEvent(new Event('input',{bubbles:true}));
@@ -108,7 +174,7 @@
       for (const item of record.details) {const el=editor.querySelectorAll('details')[item.index];if(el)el.open=item.open;}
       for (const [key,text] of errors) {const el=document.getElementById(key);if(el && el.setCustomValidity){el.setCustomValidity(text);el.setAttribute('aria-invalid','true');}}
       updateRecipeSummary();restoring=false;renderDrafts();$('#item-name').focus();
-      message('Черновик восстановлен. Основная карточка изменится только после нажатия «Сохранить».');
+      message('Черновик восстановлен. '+(missingFolder ? 'Прежняя папка больше не существует: выбран раздел «Без папки». ' : '')+'Основная карточка изменится только после нажатия «Сохранить».');
     } catch(error) {
       restoring=false;dirty=false;selectedId=state.recipes.some(r=>r.id===id)?id:null;openSelected();
       message('Не удалось открыть черновик: '+error.message+' Черновик и сохранённая база не изменены.',true);
@@ -167,16 +233,21 @@
       $(`[data-tab="${key}"]`).setAttribute('aria-current',section === key ? 'page' : 'false');
     }
     const query = $('#library-search').value.toLocaleLowerCase('ru').trim();
-    const list = collection().filter(item => (item.name+' '+(item.aliases || '')).toLocaleLowerCase('ru').includes(query));
+    renderFolders(query);
+    const list = collection().filter(item => (item.name+' '+(item.aliases || '')).toLocaleLowerCase('ru').includes(query) &&
+      (section !== 'dish' || query || folderFilter === 'all' || (folderFilter === 'unfiled' ? !item.folderId : item.folderId === selectedFolderId())));
+    const folderNames = new Map((state.folders || []).map(folder=>[folder.id,folder.name]));
     $('#library-list').innerHTML = list.length ? list.map(item => {
       let caption;
       if (isCatalog()) {
         const base = section === 'packaging' ? P.basePrice(item) : C.productBasePrice(item);
         const units = section === 'packaging' ? P.units : C.units;
         caption = base.value == null ? 'Нет цены' : money(base.value) + ' / ' + units[base.unit].label;
+      } else if(section === 'dish') {
+        caption = query && folderNames.size ? folderNames.get(item.folderId) || 'Без папки' : 'Техкарта';
       } else {
         const result = C.calcRecipe(state,item.id);
-        caption = section === 'dish' ? 'Техкарта' : result.complete ? money(result.knownCost) + (section === 'prep' ? ' / партия' : ' / порция') : 'Неполная калькуляция';
+        caption = result.complete ? money(result.knownCost) + ' / партия' : 'Неполная калькуляция';
       }
       return `<button class="library-item library-row ${section === 'products' ? 'product-row' : ''} ${item.id === selectedId ? 'active' : ''}" data-open="${esc(item.id)}" aria-current="${item.id === selectedId ? 'true' : 'false'}"><strong>${esc(item.name)}</strong><small>${esc(caption)}</small></button>`;
     }).join('') : '<p class="field-help">Ничего не найдено. Создайте новую запись.</p>';
@@ -206,6 +277,18 @@
   function renderCard() {
     editor.innerHTML = `<div class="card-controls"><button id="back-list">← К списку</button><button id="edit-recipe">Изменить</button><button id="print-recipe">Печать</button><label>Форма карты<select id="card-mode"><option value="calculation" ${cardMode==='calculation'?'selected':''}>Калькуляционная карта</option><option value="chef" ${cardMode==='chef'?'selected':''}>Карта повара</option></select></label><label>Количество порций<input id="view-portions" type="text" inputmode="decimal" value="${esc(num(viewPortions,8))}"></label><label>Фотографии при печати<select id="print-photos"><option value="none">Без фотографий</option><option value="first">Только первая</option><option value="second">Только вторая</option><option value="both">Обе фотографии</option></select></label><p id="view-error" role="status"></p></div><article id="recipe-card" class="recipe-card"></article>`;
     const card=$('#recipe-card');
+    const moveControls = document.createElement('div');moveControls.className = 'recipe-folder-move';
+    moveControls.innerHTML = `<label>Папка блюда<select id="move-folder">${folderOptions(draft.folderId)}</select></label><button id="move-recipe" disabled>Переместить</button>`;
+    $('.card-controls',editor).append(moveControls);$('#move-folder').value = draft.folderId || '';
+    $('#move-folder').addEventListener('change',()=>{$('#move-recipe').disabled = $('#move-folder').value === (draft.folderId || '');});
+    $('#move-recipe').addEventListener('click',()=>{
+      try {
+        const target = $('#move-folder').value;
+        if(!persistFolders(F.move(state,draft.id,target),'Блюдо перемещено. Рецепт и фотографии сохранены.')) {refreshFolderFields();return;}
+        draft = clone(state.recipes.find(recipe=>recipe.id === draft.id));
+        refreshFolderFields();renderLibrary();
+      } catch(error) {message(error.message,true);}
+    });
     let cardValid=false, readinessVersion=0;
     function updatePrintReadiness() {
       const version=++readinessVersion, selection=printPhotoChoices[cardMode];
@@ -314,12 +397,16 @@
     summary();
   }
   function renderRecipe() {
-    editor.innerHTML = head(section === 'prep' ? 'Полуфабрикат · партия' : 'Блюдо · рецептура',section === 'prep' ? 'Сырьё считается по закупочной стоимости. Себестоимость готового продукта зависит от фактического выхода партии.' : 'Выбирайте продукты и готовые полуфабрикаты. Их производственные потери уже учтены.') + `<div id="photo-editor" class="recipe-photo-editor"></div><div class="editor-content"><div class="section-heading"><h3>Ингредиенты</h3><small id="row-count"></small></div><div class="ingredient-head" aria-hidden="true"><span>Продукт / полуфабрикат</span><span>Количество</span><span>Ед.</span><span>Стоимость</span><span></span></div><div id="ingredients"></div>${section === 'dish' ? '<div id="packaging-editor"></div>' : ''}
+    editor.innerHTML = head(section === 'prep' ? 'Полуфабрикат · партия' : 'Блюдо · рецептура',section === 'prep' ? 'Сырьё считается по закупочной стоимости. Себестоимость готового продукта зависит от фактического выхода партии.' : 'Выбирайте продукты и готовые полуфабрикаты. Их производственные потери уже учтены.') + (section === 'dish' ? `<div class="recipe-folder-editor"><label>Папка блюда<select id="recipe-folder">${folderOptions(draft.folderId)}</select></label></div>` : '') + `<div id="photo-editor" class="recipe-photo-editor"></div><div class="editor-content"><div class="section-heading"><h3>Ингредиенты</h3><small id="row-count"></small></div><div class="ingredient-head" aria-hidden="true"><span>Продукт / полуфабрикат</span><span>Количество</span><span>Ед.</span><span>Стоимость</span><span></span></div><div id="ingredients"></div>${section === 'dish' ? '<div id="packaging-editor"></div>' : ''}
       ${section === 'prep' ? `<div class="yield-panel"><div><h3>Фактический выход партии</h3><p>Взвесьте всю готовую партию. По этому значению рассчитывается себестоимость грамма и килограмма.</p></div><label>Выход готовой партии, г${numericInput('actualYield',draft.actualYield,'Обязательно')}</label></div>` : ''}
       ${section === 'dish' ? `<div class="product-grid recipe-note"><label>Количество порций в рецепте${numericInput('recipe-portions',draft.portions || 1)}</label><label>Фактический выход блюда, г (необязательно)${numericInput('dish-yield',draft.actualYield)}</label></div>` : ''}
       <label class="recipe-note">Способ приготовления<textarea id="technology" maxlength="10000">${esc(draft.technology)}</textarea></label>
-      <details class="recipe-note" ${draft.note ? 'open' : ''}><summary>Заметка к рецепту</summary><textarea id="recipe-note" placeholder="Что нужно уточнить или учесть">${esc(draft.note)}</textarea></details><div id="summary" class="summary" aria-live="polite"></div><p id="form-error" class="inline-error" role="status"></p></div>` + actions(true);
+      <details class="recipe-note" ${draft.note ? 'open' : ''}><summary>Заметка к рецепту</summary><textarea id="recipe-note" placeholder="Что нужно уточнить или учесть">${esc(draft.note)}</textarea></details><div id="summary" class="summary" aria-live="polite"></div>${section === 'dish' ? `<div class="selling-price-editor recipe-note"><label>Цена продажи блюда, ₽${numericInput('selling-price',draft.sellingPrice,'Не задана')}</label><p class="field-help">Цена за одну порцию. Показатели ниже рассчитаны только по продуктовой себестоимости, без упаковки.</p></div><div id="profitability-preview" aria-live="polite"></div>` : ''}<p id="form-error" class="inline-error" role="status"></p></div>` + actions(true);
     bindCommon(); renderRows();
+    $('#recipe-folder')?.addEventListener('change',event=>{
+      if(event.target.value) draft.folderId = event.target.value;else delete draft.folderId;
+      markDirty();
+    });
     photoEditor=Photos.mountEditor($('#photo-editor'),{recipe:draft,
       onChange:({previousPhotoId,previousPhotoIds=[]})=>{[previousPhotoId,...previousPhotoIds].filter(Boolean).forEach(id=>unusedPhotos.add(id));markDirty();flushDraft();},
       onStatus:(text)=>{if(text)message(text,true);}
@@ -331,6 +418,11 @@
       onError:(key,text)=>{if(text) errors.set(key,text);else errors.delete(key);}
     });
     $('#technology').addEventListener('input', e => {draft.technology = e.target.value;markDirty();});
+    $('#selling-price')?.addEventListener('input',event=>{
+      const parsed=numeric(event.target);
+      if(parsed.ok)draft.sellingPrice=parsed.value;
+      markDirty();updateRecipeSummary();
+    });
     for (const [id,key] of [['recipe-portions','portions'],['dish-yield','actualYield']]) {
       $('#'+id)?.addEventListener('input', e => {const parsed = numeric(e.target,{positive:true}); if(parsed.ok) {if(key === 'portions' && parsed.value == null) {errors.set(id,'Укажите количество порций.');e.target.setAttribute('aria-invalid','true');e.target.setCustomValidity('Укажите количество порций.');} else draft[key] = parsed.value;} markDirty();updateRecipeSummary();});
     }
@@ -471,6 +563,10 @@
     const allIssues = [...errors.values(),...result.issues,...packaging.issues,...(!Number.isFinite(total) ? ['Слишком большая полная себестоимость.'] : [])];
     const summary = $('#summary');summary.className = 'summary'+(incomplete ? ' incomplete' : '');
     summary.innerHTML = `<div class="summary-top"><div><div class="summary-label">${incomplete ? 'Известная часть стоимости' : section === 'prep' ? 'Стоимость всей партии' : (draft.packaging || []).length ? 'Полная себестоимость рецепта' : 'Продуктовая себестоимость рецепта'}</div><div class="summary-value">${esc(money(total))}</div>${(draft.packaging || []).length ? `<p class="summary-breakdown">Ингредиенты: ${esc(money(result.knownCost))} · Упаковка: ${esc(money(packaging.knownCost))}<br>На одну порцию: ${esc(money(total/(draft.portions || 1)))}</p>` : ''}<div class="summary-meta">${section === 'prep' ? 'Фактический выход' : 'Расчётный выход рецепта'}: ${result.massGrams == null ? 'неизвестен — нужна масса всех компонентов' : esc(num(result.massGrams))+' г'}${section === 'prep' && !incomplete && result.costPerGram != null ? `<br>${esc(money(result.costPerGram))} / г · ${esc(money(result.costPerGram*1000))} / кг` : ''}</div></div><span class="summary-status">${incomplete ? 'Расчёт неполный' : 'Рассчитано'}</span></div>${incomplete ? `<ul class="issues">${[...new Set(allIssues)].map(s => `<li>${esc(s)}</li>`).join('')}</ul><p class="draft-note">Известная часть суммы не является полной продуктовой себестоимостью.</p>` : ''}`;
+    if(section==='dish') $('#profitability-preview').innerHTML=KitchenProfitabilityView.render(currentState(),draft.id,{
+      invalid:errors.has('selling-price'),
+      foodInvalid:[...errors.keys()].some(key=>key!=='selling-price' && !key.startsWith('pack-'))
+    });
     $('#form-error').textContent = errors.size ? 'Исправьте ввод: '+[...errors.values()][0] : '';
   }
   function saveDraft() {
@@ -519,6 +615,7 @@
   $('#create').addEventListener('click',() => {
     if(!canLeave()) return;
     draft = section === 'products' ? {id:uid('product'),name:'',aliases:'',price:null,packQuantity:1,unit:'kg',massPerPiece:null,gramsPerMl:null,note:''} : section === 'packaging' ? {id:uid('packaging'),name:'',price:null,packQuantity:1,unit:'pcs',note:''} : {id:uid(section),type:section,name:'',note:'',actualYield:null,ingredients:[]};
+    if(section === 'dish' && selectedFolderId()) draft.folderId = selectedFolderId();
     clearTimeout(draftTimer);draftStatus='';
     viewing = false;selectedId = draft.id;dirty = true;isNew = true;errors.clear();invalidValues.clear();renderLibrary();renderEditor();markDirty();renderDrafts();$('#item-name').focus();
   });
@@ -528,6 +625,41 @@
   $('[data-tab="products"]').addEventListener('click',() => switchSection('products'));
   $('[data-tab="packaging"]').addEventListener('click',() => switchSection('packaging'));
   $('#library-search').addEventListener('input',renderLibrary);
+  $('#folder-filter').addEventListener('change',event=>{
+    const next = event.target.value;
+    if(!canLeave()) {event.target.value = folderFilter;return;}
+    $('#folder-form').hidden = true;folderFormId = null;
+    folderFilter = next;selectedId = null;openSelected();
+  });
+  $('#folder-create').addEventListener('click',()=>showFolderForm());
+  $('#folder-rename').addEventListener('click',()=>showFolderForm(selectedFolderId()));
+  function closeFolderForm() {
+    $('#folder-form').hidden = true;$('#folder-error').hidden = true;
+    $(folderFormId ? '#folder-rename' : '#folder-create').focus();folderFormId = null;
+  }
+  $('#folder-cancel').addEventListener('click',closeFolderForm);
+  $('#folder-form').addEventListener('keydown',event=>{if(event.key === 'Escape') {event.preventDefault();closeFolderForm();}});
+  $('#folder-form').addEventListener('submit',event=>{
+    event.preventDefault();
+    try {
+      const name = $('#folder-name').value;
+      const candidate = folderFormId ? F.rename(state,folderFormId,name) : F.create(state,uid('folder'),name);
+      if(!persistFolders(candidate,folderFormId ? 'Название папки сохранено.' : 'Папка создана.')) return;
+      closeFolderForm();refreshFolderFields();renderLibrary();
+    } catch(error) {const el = $('#folder-error');el.textContent = error.message;el.hidden = false;$('#folder-name').focus();}
+  });
+  $('#folder-delete').addEventListener('click',()=>{
+    if(!folderActionAllowed()) return;
+    const folder = (state.folders || []).find(item=>item.id === selectedFolderId());
+    if(!folder) return;
+    const count = state.recipes.filter(recipe=>recipe.type === 'dish' && recipe.folderId === folder.id).length;
+    if(!confirm(`Удалить папку «${folder.name}»? Блюда (${count}) не удалятся и перейдут в «Без папки». Черновики сохранятся отдельно.`)) return;
+    try {
+      if(!persistFolders(F.remove(state,folder.id),'Папка удалена. Все блюда сохранены в разделе «Без папки».')) return;
+      folderFilter = 'unfiled';$('#folder-form').hidden = true;folderFormId = null;
+      refreshFolderFields();renderLibrary();
+    } catch(error) {message(error.message,true);}
+  });
   let backupBusy=false;
   $('#export').addEventListener('click',async () => {
     if(backupBusy)return;
@@ -538,36 +670,40 @@
     try {
       const portable=await Photos.exportData(state);
       const text = S.stringify(portable), url = URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));
-      const link = document.createElement('a');link.href = url;link.download = 'kitchen-calculator-PR2-TEST-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);
+      const link = document.createElement('a');link.href = url;link.download = 'kitchen-calculator-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(() => URL.revokeObjectURL(url),1000);
       message('JSON с сохранёнными карточками и фотографиями подготовлен к скачиванию.'+(hasUnfinishedRecipe?' Незавершённый черновик хранится отдельно: сначала нажмите «Сохранить», чтобы включить изменения в резервную копию.':''));
     } catch(e) {message('Экспорт не выполнен: '+e.message,true);}
     finally {backupBusy=false;$('#export').disabled=false;}
   });
-  $('#import').addEventListener('click',() => {$('#import-file').value = '';$('#import-file').click();});
-  $('#import-file').addEventListener('change',async e => {
-    const file = e.target.files[0];if(!file) return;
-    if(backupBusy || photoEditor?.busy) {message('Дождитесь завершения обработки фотографии или резервной копии.',true);return;}
-    let prepared=null;
+  KitchenImportUI.mount({
+    getState:()=>state,
+    getDraftSource:()=>localStorage.getItem(D.KEY),
+    canStart:()=>{
+      if(backupBusy || photoEditor?.busy) {message('Дождитесь завершения обработки фотографии или резервной копии.',true);return false;}
+      if(recoveryRequired || storageBlocked) {message('Импорт заблокирован: текущую базу не удалось прочитать или сохранить. Скачайте исходные данные или экспорт и сохраните черновик перед восстановлением.',true);return false;}
+      if(dirty && !editingRecipe()) {message('Сначала сохраните изменения справочника или выйдите из редактора с подтверждением. Введённые поля сохранены на экране.',true);return false;}
+      if(editingRecipe() && dirty && !flushDraft()) {message('Не удалось сохранить черновик перед импортом. Основная база не изменена.',true);return false;}
+      return true;
+    },
+    setBusy:value=>{
+      backupBusy=value;$('#import').disabled=value;$('#export').disabled=value;
+      $('.workspace').inert=value;$('#drafts-panel').inert=value;$('.tabs').inert=value;
+    },
+    onApplied:data=>{
+      state=data;storageBlocked=false;recoveryRequired=false;
+      $('#folder-form').hidden=true;folderFormId=null;
+      selectedId=collection()[0]?.id || null;openSelected();
+    },message
+  });
+  $('#damaged-source').hidden=!recoveryRequired;
+  $('#download-damaged-source').addEventListener('click',()=>{
     try {
-      if(file.size > S.MAX_IMPORT_BYTES) throw Error('Файл больше 50 МБ.');
-      const candidate = S.parseJSON(await file.text());
-      if(editingRecipe() && dirty && !flushDraft()) throw Error('Не удалось сохранить текущий черновик перед импортом.');
-      if(!confirm(`Заменить все текущие данные данными из файла? Продуктов: ${candidate.products.length}, рецептов: ${candidate.recipes.length}, позиций упаковки: ${(candidate.packaging || []).length}. Черновики рецептов останутся отдельно. Рекомендуем сначала сделать экспорт.`)) return;
-      backupBusy=true;$('#import').disabled=true;$('#export').disabled=true;
-      $('.workspace').inert=true;$('#drafts-panel').inert=true;
-      prepared=await Photos.prepareImport(candidate);
-      const oldPhotoIds=state.recipes.flatMap(r=>Photos.ids(r)).filter(Boolean);
-      if(persist(prepared.data,'Данные импортированы. Сохранённые карточки заменены. Черновики остались отдельно.',true)) {
-        prepared=null;
-        if(!storageBlocked)oldPhotoIds.forEach(id=>unusedPhotos.add(id));
-        selectedId = collection()[0]?.id || null;openSelected();
-      }
-    } catch(e) {message('Импорт отменён: '+e.message+' Текущие данные не изменены.',true);}
-    finally {
-      if(prepared)await Photos.rollback(prepared.createdIds).catch(()=>{});
-      backupBusy=false;$('#import').disabled=false;$('#export').disabled=false;
-      $('.workspace').inert=false;$('#drafts-panel').inert=false;
-    }
+      const original=localStorage.getItem(S.KEY);
+      if(original===null)throw Error('Исходная запись отсутствует.');
+      const url=URL.createObjectURL(new Blob([original],{type:'application/json;charset=utf-8'}));
+      const link=document.createElement('a');link.href=url;link.download='kitchen-original-recovery.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      message('Исходная запись подготовлена к скачиванию без изменений. Фотографии и черновики не удалены.');
+    } catch(error) {message('Не удалось скачать исходную запись: '+error.message,true);}
   });
   window.addEventListener('beforeunload',e => {
     const safe=editingRecipe() && dirty ? flushDraft() : !dirty;
@@ -576,9 +712,6 @@
   window.addEventListener('pagehide',()=>flushDraft());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushDraft();});
   openSelected();
-  if(loaded.error) message('Не удалось прочитать сохранённые данные: '+loaded.error+' Исходная запись не перезаписана. Автоматическая запись заблокирована; восстановите данные через импорт резервной копии JSON.',true);
-  else if(!loaded.data) {
-    const saved = S.save(state);
-    if(!saved.ok) {storageBlocked = true;if($('#save-state')) $('#save-state').textContent = 'В памяти · скачайте JSON';message('Браузер не разрешил сохранение: '+saved.error+' Скачивайте JSON перед закрытием страницы.',true);}
-  }
+  if(loaded.error) message('Не удалось прочитать сохранённые данные: '+loaded.error+' Исходная запись не перезаписана. Автоматическая запись и импорт заблокированы. Скачайте исходную запись для восстановления; фотографии и черновики остаются в браузере.',true);
+  else if(!loaded.data) message('Рабочая база в этом браузере пока не загружена. Нажмите «Импорт JSON» и выберите свою сохранённую копию. После импорта ваши рецепты будут загружаться при следующем открытии в этом браузере.');
 })();

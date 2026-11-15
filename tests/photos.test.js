@@ -7,8 +7,8 @@ const fixture=()=>({version:1,products:[],recipes:[{id:'dish-test',type:'dish',n
 const embedded=()=>({dataUrl:'data:image/jpeg;base64,/9j/2Q==',width:1,height:1,mime:'image/jpeg'});
 
 test('photos live in an isolated IndexedDB and keep the existing database key/version',()=>{
-  assert.equal(Photos.DB_NAME,'kitchen-calculator-test-photos-v1');
-  assert.equal(S.KEY,'kitchen-calculator-pr2-browser-test-v1');
+  assert.equal(Photos.DB_NAME,'kitchen-calculator-photos-v1');
+  assert.equal(S.KEY,'kitchen-calculator-v1');
   assert.equal(S.validate(fixture()).version,1);
 });
 test('old backups without optional photos remain byte-for-byte structurally compatible',()=>{

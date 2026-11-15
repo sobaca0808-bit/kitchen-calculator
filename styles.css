@@ -940,6 +940,16 @@ button:disabled { opacity:.55; cursor:default; }
 .card-text { white-space:pre-wrap; overflow-wrap:anywhere; }
 td .card-text { font-size:12px; }
 .card-cost { font-weight:700; }
+.selling-price-editor { max-width:460px; }
+.profitability-card { margin-top:24px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--paper);overflow-wrap:anywhere; }
+.profitability-card h2 { margin-top:0;font-size:18px; }
+.profitability-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0; }
+.profitability-grid>div { padding:12px;background:#f5f7f2;border-radius:7px;min-width:0; }
+.profitability-grid dt { color:var(--muted);font-size:12px;line-height:1.5; }
+.profitability-grid dd { margin:4px 0 0;font-size:19px;font-weight:650;line-height:1.4; }
+.profitability-basis,.profitability-status,.profitability-note { font-size:12px;line-height:1.6;margin:10px 0 0; }
+.profitability-basis,.profitability-note { color:var(--muted); }
+.profitability-status { color:var(--amber); }
 @media(max-width:760px) {
   .recipe-card { padding:16px 10px; font-size:13px; }
   .recipe-card th,.recipe-card td { padding:7px 4px; }
@@ -947,6 +957,10 @@ td .card-text { font-size:12px; }
   .card-controls input,.card-controls select { font-size:16px; }
   .form-actions button { min-height:44px; font-size:12px; }
   .library-item { min-height:60px; }
+  .profitability-card { padding:14px 12px; }
+  .profitability-grid { gap:8px; }
+  .profitability-grid>div { padding:10px 8px; }
+  .profitability-grid dd { font-size:17px; }
 }
 @page { size:A4; margin:15mm; }
 @media print {
@@ -962,6 +976,11 @@ td .card-text { font-size:12px; }
   .recipe-card h1,.recipe-card h2 { break-after:avoid; }
   .card-text { orphans:3; widows:3; }
   .recipe-card th,.recipe-card td { border-color:#aaa; }
+  .profitability-card { border-color:#aaa;border-radius:0;padding:12px;margin-top:18px;break-inside:avoid; }
+  .profitability-card h2 { margin-top:0; }
+  .profitability-grid>div { background:none;padding:5px 0; }
+  .profitability-grid dd { font-size:12pt; }
+  .profitability-grid dt,.profitability-basis,.profitability-status,.profitability-note { font-size:9pt;color:black; }
   button,input,select,textarea { display:none !important; }
 }
 
@@ -1209,3 +1228,36 @@ td .card-text { font-size:12px; }
   .photo-viewer-zoom button { font-size:12px; }
 }
 @media print { .photo-viewer,.photo-viewer::backdrop { display:none !important; } }
+
+/* Compact A4 calculation cards; screen layout and photo dimensions stay intact. */
+@media print {
+  .recipe-card[data-mode=calculation] { font-size:10.5pt;line-height:1.25; }
+  .recipe-card[data-mode=calculation] p { margin:0 0 2px; }
+  .recipe-card[data-mode=calculation] > .eyebrow { margin-bottom:2px; }
+  .recipe-card[data-mode=calculation] h1 { font-size:18pt;line-height:1.15;margin:0 0 2px; }
+  .recipe-card[data-mode=calculation] h2 { font-size:11.5pt;line-height:1.2;margin:4px 0 2px; }
+  .recipe-card[data-mode=calculation] table { font-size:9.5pt;line-height:1.2;margin:4px 0; }
+  .recipe-card[data-mode=calculation] th,
+  .recipe-card[data-mode=calculation] td { padding:1px 6px; }
+  .recipe-card[data-mode=calculation] td .card-text,
+  .recipe-card[data-mode=calculation] .packaging-card-note { font-size:9pt;line-height:1.2; }
+  .recipe-card[data-mode=calculation] .prep-label { margin-top:0;padding:0 4px;line-height:1.2; }
+  .recipe-card[data-mode=calculation] .recipe-photos { margin:3px 0; }
+  .recipe-card[data-mode=calculation] .packaging-card { margin-top:6px; }
+  .recipe-card[data-mode=calculation] .card-raw-mass,
+  .recipe-card[data-mode=calculation] .card-yield,
+  .recipe-card[data-mode=calculation] .food-cost,
+  .recipe-card[data-mode=calculation] .card-cost,
+  .recipe-card[data-mode=calculation] .portion-cost { display:inline-block;vertical-align:top;width:49%;margin-bottom:1px; }
+  .recipe-card[data-mode=calculation] .field-help { font-size:9pt;line-height:1.2;margin-bottom:3px; }
+  .recipe-card[data-mode=calculation] .profitability-card { padding:4px;margin-top:4px; }
+  .recipe-card[data-mode=calculation] .profitability-card h2 { margin-top:0; }
+  .recipe-card[data-mode=calculation] .profitability-grid { gap:2px 8px;margin:2px 0; }
+  .recipe-card[data-mode=calculation] .profitability-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .recipe-card[data-mode=calculation] .profitability-grid>div { padding:1px 0; }
+  .recipe-card[data-mode=calculation] .profitability-grid dd { font-size:10.5pt;line-height:1.2;margin-top:1px; }
+  .recipe-card[data-mode=calculation] .profitability-grid dt,
+  .recipe-card[data-mode=calculation] .profitability-basis,
+  .recipe-card[data-mode=calculation] .profitability-status,
+  .recipe-card[data-mode=calculation] .profitability-note { font-size:9pt;line-height:1.25; }
+}

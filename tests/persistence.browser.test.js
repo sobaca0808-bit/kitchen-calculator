@@ -1,0 +1,57 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
+const {chromium}=require('playwright');
+const url=process.env.KITCHEN_TEST_URL;
+const location=new URL(url);
+if(location.protocol!=='http:'||!['localhost','127.0.0.1','[::1]'].includes(location.hostname))throw Error('Browser test only runs on a disposable loopback server');
+const key='kitchen-calculator-v1';
+const name='Рис для проверки сохранения';
+(async()=>{
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'kitchen-persistent-'));
+ let context;
+ try {
+   context=await chromium.launchPersistentContext(directory,{headless:true,viewport:{width:390,height:844}});
+   const page=context.pages()[0]||await context.newPage();
+   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.goto(url);
+   assert.equal(await page.evaluate(()=>KitchenStorage.KEY),key);
+   assert.equal(await page.locator('.test-notice').count(),0);
+   assert.equal(await page.evaluate(k=>localStorage.getItem(k),key),null,'No initial seed may overwrite missing data');
+   assert.equal(await page.locator('[data-open]').count(),0,'Empty database stays empty');
+   await page.locator('[data-tab="products"]').click();
+   await page.locator('#create').click();
+   await page.locator('#item-name').fill(name);
+   await page.locator('#price').fill('150');
+   await page.locator('#save-item').click();
+   let data=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
+   assert.equal(data.products.length,1);
+   assert.equal(data.products[0].name,name);
+   assert.equal(data.products[0].price,150);
+   await page.reload();
+   data=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
+   assert.equal(data.products[0].price,150);
+   await page.locator('[data-tab="products"]').click();
+   assert.equal(await page.locator('[data-open]').count(),1);
+   await page.locator('[data-tab="dish"]').click();
+   await page.locator('#create').click();
+   await page.locator('#item-name').fill('Проверочная техкарта');
+   await page.locator('#save-item').click();
+   data=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
+   assert.equal(data.recipes.length,1);
+   assert.equal(data.recipes[0].name,'Проверочная техкарта');
+   await context.close();context=null;
+   context=await chromium.launchPersistentContext(directory,{headless:true,viewport:{width:390,height:844}});
+   const again=context.pages()[0]||await context.newPage();
+   await again.goto(url);
+   data=await again.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
+   assert.equal(data.products[0].price,150,'Price survives complete browser restart');
+   assert.equal(data.recipes[0].name,'Проверочная техкарта','Recipe survives complete browser restart');
+   assert.equal(await again.locator('[data-open]').count(),1);
+   assert.deepEqual(errors,[]);
+   console.log('PASS: empty first launch, save, reload, full browser restart, product price and recipe persistence');
+ } finally {
+   if(context)await context.close();
+   await fs.rm(directory,{recursive:true,force:true});
+ }
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -3,16 +3,17 @@
  * Serve the repository first: python3 -m http.server 8765 --bind 127.0.0.1
  * Override KITCHEN_TEST_URL / CHROMIUM_PATH if needed. No build is required. */
 'use strict';
+const {replaceJSONFromFile}=require('./helpers/import-preview.js');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const { chromium } = require('playwright');
 const URL = process.env.KITCHEN_TEST_URL || 'http://127.0.0.1:8765';
-const PREVIEW_KEY = 'kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
+const PREVIEW_KEY = 'kitchen-calculator-v1';
+const DRAFT_KEY = 'kitchen-calculator-drafts-v1';
 const previewOperation = op => op.method !== 'clear' && [PREVIEW_KEY,DRAFT_KEY].includes(op.key);
 const target = new globalThis.URL(URL);
 const local = ['localhost','127.0.0.1','[::1]'].includes(target.hostname);
-const publishedTest = target.protocol === 'https:' && target.hostname === 'sobaca0808-bit.github.io' && target.pathname.startsWith('/kitchen-calculator-test/');
+const publishedTest = target.protocol === 'https:' && target.hostname === 'sobaca0808-bit.github.io' && target.pathname.startsWith('/kitchen-calculator/');
 if (!['http:','https:'].includes(target.protocol) || (!local && !publishedTest)) {
   throw Error('Browser checks are limited to localhost and the isolated kitchen-calculator-test site.');
 }
@@ -44,20 +45,15 @@ const stored = page => page.evaluate(() => JSON.parse(localStorage.getItem(Kitch
 async function tab(page,key) { await page.locator(`[data-tab="${key}"]`).click(); }
 async function editIfCard(page) {if(await page.locator('#edit-recipe').count()) await page.locator('#edit-recipe').click();}
 async function open(page,id) {await page.locator(`[data-open="${id}"]`).click();await editIfCard(page);}
-async function importJSON(page,data,accept = true) {
-  page.removeAllListeners('dialog');
-  page.once('dialog',dialog => accept ? dialog.accept() : dialog.dismiss());
-  await page.locator('#import-file').setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(typeof data === 'string' ? data : JSON.stringify(data))});
-  await page.waitForTimeout(120);
-  page.removeAllListeners('dialog');page.on('dialog',dialog=>dialog.accept());
-}
+async function importJSON(page,data,accept=true){return replaceJSONFromFile(page,data,{name:'backup.json',accept,waitForCompletion:true});}
+
 (async () => {
   browser = await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',headless:true,args:['--no-sandbox']});
   for (const width of [1366,360,390,430]) {
     await test(`Production-key sentinel remains unchanged throughout preview workflow at ${width}px`,async(page,context)=>{
       const sentinel = '{"fictional":"protected-production-placeholder"}';
       await page.evaluate(value=>{
-        localStorage.setItem('kitchen-calculator-v1',value);
+        localStorage.setItem('kitchen-calculator-pr2-browser-test-v1',value);
         localStorage.setItem('unrelated-sentinel',value);
       },sentinel);
       await context.addInitScript(()=>{
@@ -92,7 +88,7 @@ async function importJSON(page,data,accept = true) {
       assert.match(await page.locator('#recipe-card').innerText(),/Проверочная карточка/);
       const downloadPromise=page.waitForEvent('download');await page.locator('#export').click();
       const download=await downloadPromise;
-      assert.match(download.suggestedFilename(),/^kitchen-calculator-PR2-TEST-/);
+      assert.match(download.suggestedFilename(),/^kitchen-calculator-/);
       const raw=await fs.readFile(await download.path(),'utf8');
       assert(!raw.includes('protected-production-placeholder'));
       const backup=JSON.parse(raw);
@@ -107,7 +103,7 @@ async function importJSON(page,data,accept = true) {
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       const proof=await page.evaluate(()=>({
         ops:window.__previewStorageOps.slice(),
-        production:localStorage.getItem('kitchen-calculator-v1'),
+        production:localStorage.getItem('kitchen-calculator-pr2-browser-test-v1'),
         unrelated:localStorage.getItem('unrelated-sentinel')
       }));
       assert.equal(proof.production,sentinel);assert.equal(proof.unrelated,sentinel);
@@ -311,13 +307,17 @@ async function importJSON(page,data,accept = true) {
       await page.setViewportSize({width,height:844});
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),`No overflow at ${width}`);
       const last=page.locator('#note-gyro-bun');await last.focus();await last.scrollIntoViewIfNeeded();
+      await page.waitForFunction(()=>{
+        const field=document.querySelector('#note-gyro-bun').getBoundingClientRect(),actions=document.querySelector('.form-actions').getBoundingClientRect();
+        return field.y>=0&&field.bottom<=innerHeight+1&&(field.bottom<=actions.top+1||field.top>=actions.bottom-1);
+      });
       const rect=await last.boundingBox();assert(rect.y>=0 && rect.y+rect.height<=844,`Last field visible at ${width}`);
-      assert.equal(await page.locator('.form-actions').evaluate(el=>getComputedStyle(el).position),'static','Actions do not cover focused fields');
+      const focusedBar=await page.locator('.form-actions').boundingBox();assert(rect.y+rect.height<=focusedBar.y+1||rect.y>=focusedBar.y+focusedBar.height-1,'Actions do not cover focused fields');
     }
     await page.locator('#search-gyro-onion').fill('томаты');
     await page.locator('#options-gyro-onion .suggestion').tap();assert.equal(await page.locator('#search-gyro-onion').inputValue(),'Помидоры');
     await page.reload();await editIfCard(page);await page.evaluate(()=>{document.activeElement.blur();document.querySelector(".editor").scrollIntoView({block:"start"});});
-    assert.equal(await page.locator('.form-actions').evaluate(el=>getComputedStyle(el).position),'sticky');
+    await page.waitForFunction(()=>{const bar=document.querySelector('.form-actions').getBoundingClientRect();return bar.y>=0&&bar.bottom<=innerHeight+1;});
     assert.match(await page.locator('#mobile-summary').innerText(),/Известная часть.*неполно/s);
     const bar=await page.locator('.form-actions').boundingBox();
     assert(bar.y>=0 && bar.y+bar.height<=844,'Compact total and add action stay inside mobile viewport');

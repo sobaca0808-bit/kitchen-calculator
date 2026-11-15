@@ -1,0 +1,27 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const S=require('../js/storage.js');
+const D=require('../js/drafts.js');
+const Seed=require('../js/seed.js');
+test('production namespace is stable; preview data never replaced',()=>{
+  assert.equal(S.KEY,'kitchen-calculator-v1');
+  assert.equal(D.KEY,'kitchen-calculator-drafts-v1');
+  const previewKey='kitchen-calculator-pr2-browser-test-v1';
+  const untouched='{"preview":"leave-alone"}';
+  const data=new Map([[previewKey,untouched]]);
+  const reads=[],writes=[];
+  const storage={getItem(key){reads.push(key);return data.get(key)||null;},setItem(key,value){writes.push(key);data.set(key,value);}};
+  assert.equal(S.load(storage).data,null);
+  const original=Seed.create();
+  assert.equal(S.save(original,storage).ok,true);
+  assert.deepEqual(S.load(storage).data,S.validate(original));
+  assert.equal(data.get(previewKey),untouched);
+  assert(reads.every(key=>key===S.KEY));
+  assert(writes.every(key=>key===S.KEY));
+  data.set(S.KEY,'{broken-work-record');
+  const error=S.load(storage);
+  assert(error.error);
+  assert.equal(data.get(S.KEY),'{broken-work-record');
+  assert.equal(data.get(previewKey),untouched);
+});

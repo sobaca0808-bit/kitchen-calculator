@@ -6,7 +6,7 @@
   'use strict';
 
   // Drafts never share a key or a write operation with the saved recipe database.
-  const KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
+  const KEY = 'kitchen-calculator-drafts-v1';
   const MAX_DRAFT_BYTES = 1024 * 1024;
   const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
   const TYPES = ['dish', 'prep'];
