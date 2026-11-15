@@ -15,7 +15,7 @@ function record(id = 'dish-new', type = 'dish', name = 'Незавершённы
   };
 }
 function memoryStorage() {
-  const entries = new Map([['kitchen-calculator-v1', '{"real":"protected"}'], ['kitchen-calculator-pr2-browser-test-v1', '{"saved":"unchanged"}']]);
+  const entries = new Map([['kitchen-calculator-pr2-browser-test-v1', '{"real":"protected"}'], ['kitchen-calculator-v1', '{"saved":"unchanged"}']]);
   const operations = [];
   return {entries, operations,
     getItem(key) { operations.push(['get', key]); return entries.get(key) ?? null; },
@@ -23,8 +23,8 @@ function memoryStorage() {
   };
 }
 function unchangedKeys(storage) {
-  assert.equal(storage.entries.get('kitchen-calculator-v1'), '{"real":"protected"}');
-  assert.equal(storage.entries.get('kitchen-calculator-pr2-browser-test-v1'), '{"saved":"unchanged"}');
+  assert.equal(storage.entries.get('kitchen-calculator-pr2-browser-test-v1'), '{"real":"protected"}');
+  assert.equal(storage.entries.get('kitchen-calculator-v1'), '{"saved":"unchanged"}');
   assert(storage.operations.every(([, key]) => key === Drafts.KEY), 'Only the exact draft namespace may be accessed');
 }
 
