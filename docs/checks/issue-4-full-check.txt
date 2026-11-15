@@ -1,0 +1,280 @@
+✔ decimal comma, point, empty price and invalid numbers (1.574547ms)
+✔ 160g with 37.5% loss gives 100g and inverse input agrees (0.3308ms)
+✔ 500 rubles per kg, actual output 600g: 100g costs 83.33, loss not reapplied (2.380243ms)
+✔ actual batch yield, not summed row yield, sets cost per gram (0.287333ms)
+✔ missing prices propagate incompleteness and a known partial sum (0.441267ms)
+✔ dependent recipes immediately reflect a changed purchase price (0.248876ms)
+✔ missing yield or quantity, empty recipe and dangling references are incomplete (0.275546ms)
+✔ zero price is valid, but zero pack or batch yield never divides by zero (0.276177ms)
+✔ volume stays volume without explicit coefficient; price works while weight unknown (0.333314ms)
+✔ piece weight gives conditional mass without changing purchase cost (0.306282ms)
+✔ raw ingredient loss affects only weight, inconsistent loss/output cannot pass (0.241945ms)
+✔ nested preparations supported and direct/indirect cycles are rejected (0.415868ms)
+✔ numeric overflow never produces a complete infinite total (0.230298ms)
+✔ shared references at 30 levels keep incomplete issue lists bounded (4.20018ms)
+✔ excessive depth is incomplete and cycle checking uses no recursive call stack (42.043128ms)
+✔ drafts preserve full raw input, recipe fields, photo references and opened details through reload (6.204826ms)
+✔ saving and deleting one exact type:id never mixes other dishes or preparations (2.715719ms)
+✔ draft data supports absent optional editor fields and preserves future JSON fields (0.364571ms)
+✔ quota failures preserve the last good draft and the saved recipe database (0.737082ms)
+✔ storage access denial reports an error without throwing or attempting a write (0.268716ms)
+✔ unreadable, unknown or duplicate draft envelopes are never overwritten (1.272541ms)
+✔ malformed draft identity, type, form values and editor state are rejected before writing (0.797484ms)
+✔ prototype setters, custom prototypes, functions and toJSON are not accepted or executed (0.355517ms)
+✔ accessor values anywhere in a draft are rejected without running user code (0.409038ms)
+✔ single draft byte limit rejects oversized UTF-8 content without replacing a saved snapshot (3.923183ms)
+✔ total storage limit preserves all existing drafts on addition failure (503.538615ms)
+✔ oversized stored envelope remains untouched during read, save and deletion (12.210283ms)
+✔ foil 60cm=3, box=10, two napkins=1, guest-free ketchup=6; total20 per portion (2.230928ms)
+✔ unit conversion is dimensional: metres/centimetres, grams/kg, ml/l and pieces only (0.227463ms)
+✔ base prices preserve zero, unknown values and finite arithmetic (0.282256ms)
+✔ default portions belong to the recipe and fresh recalculation never compounds rounding (4.271137ms)
+✔ a matching ingredient is not charged twice, even when names differ by case, spaces and ё (0.807559ms)
+✔ duplicate detection follows prep ingredients and explicit additional/included modes are respected (0.471181ms)
+✔ zero or unknown food quantity does not exempt an actual packaging serving (0.306833ms)
+✔ zero or unknown nested prep consumption cannot hide packaging cost (0.372041ms)
+✔ packaging and food yield are independent and guest-free flag does not change procurement cost (0.429138ms)
+✔ missing prices, quantities, references and mismatched units remain incomplete rather than zero-valued complete (0.644884ms)
+✔ included duplicate needs no second price but still requires valid consumption and units (0.255495ms)
+✔ overflow and underflow never produce a complete infinite or silently free result (0.433925ms)
+✔ old version1 backups stay byte-structure compatible and optional fields are not inserted (1.631633ms)
+✔ new packaging catalog and per-portion rows survive JSON/save/load without touching old data (1.113551ms)
+✔ packaging schema validates lengths, dimensions, references, uniqueness and flags independently of food units (1.131588ms)
+✔ nonempty packaging on a prep is rejected rather than importing hidden serving costs (0.438381ms)
+✔ resolveLinks persists stable auto dedup identities without mutating the input (0.629711ms)
+✔ stable identities follow nested positive food consumption but do not exempt removed or zeroed food (0.476269ms)
+✔ inactive identity falls back to a current same-name ingredient; explicit modes do not gain auto links (0.299322ms)
+✔ dedup identity metadata is optional text, never an unchecked object or numeric coercion (0.633396ms)
+✔ print selection addresses the requested photo positions without substituting another slot (1.16589ms)
+✔ invalid print selections fail explicitly, including inherited property names and coerced values (0.422488ms)
+✔ print selection does not retain mutable choices or modify saved photo references (0.282576ms)
+✔ photos live in an isolated IndexedDB and keep the existing database key/version (2.13964ms)
+✔ old backups without optional photos remain byte-for-byte structurally compatible (0.793838ms)
+✔ local photo references round-trip without embedding blobs in localStorage (0.660477ms)
+✔ portable photo JSON is accepted but must be staged before saving the main database (0.575939ms)
+✔ schema rejects remote or executable photo URLs, malformed references and double photo fields (0.77494ms)
+✔ photo payload budget checks decoded bytes as well as encoded length (3.882161ms)
+✔ invalid photo IDs fail before trying to open a browser database (0.472683ms)
+✔ photo-free export/import needs no IndexedDB or browser-only API (0.459593ms)
+✔ quality limits retain larger useful images with a bounded two-photo budget (0.192821ms)
+✔ ids normalizes new and old photo references without mutating any recipe (0.294885ms)
+✔ two local photo slots round-trip with order and empty frame preserved (0.800769ms)
+✔ two portable photo slots remain ordered and cannot be written as main localStorage blobs (0.544642ms)
+✔ more than two slots, malformed entries and mixed photo formats never overwrite stored data (0.4968ms)
+✔ new 1920px embedded photos are accepted; over-budget images still fail before writes (1.863113ms)
+✔ invalid source requests are serialized and do not poison the compression queue (0.75492ms)
+✔ oversized JPEG, PNG and WebP dimensions are rejected before allocating a decoded image (1.194774ms)
+✔ a cook takes 100g of ready prep; production yield affects cost only once (2.730983ms)
+✔ calculation retains raw quantity, output and all existing financial results (0.309067ms)
+✔ ready quantities stay per serving when the saved recipe has several portions (0.430771ms)
+✔ classification follows the saved reference, not the ingredient name (0.213993ms)
+✔ nested preparations remain a single assembly row (0.298971ms)
+✔ litres, kilograms and pieces use assembly base units without coefficient mixing (0.286603ms)
+✔ processed ordinary product shows ready output, including a valid zero output (0.213262ms)
+✔ missing prices or prep yield do not hide a known ready portion or leak cost issues (0.300704ms)
+✔ unknown quantities stay unknown; a missing reference is never labelled as prep (0.405171ms)
+✔ repeated fresh scaling preserves decimal quantities without cumulative rounding (4.605011ms)
+✔ old recipes without portions and optional metadata still use one serving (0.596891ms)
+✔ invalid modes, portions and arithmetic overflow cannot create misleading quantities (1.204438ms)
+✔ production book, drafts, photos and recovery copies have distinct fixed namespaces (1.618433ms)
+✔ normal load/save touches production only, even with a valuable legacy database (0.702711ms)
+✔ read-only inspection: only old production (1.336638ms)
+✔ read-only inspection: only erroneous-release/test source (0.28441ms)
+✔ read-only inspection: two different valuable databases (0.385893ms)
+✔ read-only inspection: neither database (0.118769ms)
+✔ a corrupt source remains byte-for-byte intact: kitchen-calculator-v1 (0.594588ms)
+✔ a corrupt source remains byte-for-byte intact: kitchen-calculator-pr2-browser-test-v1 (0.519424ms)
+✔ read denial is reported and cannot authorize a replacement (0.916995ms)
+✔ inspection can avoid all legacy reads for an ordinary JSON import (0.541687ms)
+✔ manual recovery requires confirmation and cannot run as an automatic migration (3.899487ms)
+✔ manual recovery creates durable literal copies before replacing only production (5.240101ms)
+✔ a missing production record stays absent if backup storage fails (0.487976ms)
+✔ corrupt production can be explicitly replaced only after preserving its literal bytes (0.9206ms)
+✔ quota failure rolls back only newly staged photos and preserves both databases/drafts (1.25844ms)
+✔ photo preparation failure cannot replace a database (1.283928ms)
+✔ source changes during preparation abort commit: kitchen-calculator-v1 (0.734168ms)
+✔ source changes during preparation abort commit: kitchen-calculator-pr2-browser-test-v1 (0.678965ms)
+✔ source changes during preparation abort commit: kitchen-calculator-drafts-v1 (0.727218ms)
+✔ source changes during preparation abort commit: kitchen-calculator-pr2-browser-drafts-v1 (0.697513ms)
+✔ repeated recovery neither duplicates records/photos nor creates another backup (1.387535ms)
+✔ unknown fields are preserved in raw export and block lossy restoration (0.536711ms)
+✔ old version-1 JSON without photos, packaging or portions still restores (0.805556ms)
+✔ conditional ordinary save rejects a different production source without overwriting it (0.319973ms)
+✔ legacy drafts preserve invalid fields and are copied once, leaving the source untouched (8.660404ms)
+✔ a conflicting production draft is retained and the copied draft receives a new identity (0.989163ms)
+✔ invalid draft JSON does not get cleared or prevent exporting its raw bytes (0.200473ms)
+✔ a conflicting copied draft remaps row and field IDs and can be saved beside the original recipe (1.55659ms)
+✔ a legacy draft cannot silently target a different saved production recipe with the same ID (1.402798ms)
+✔ a future production schema is blocked on load before an editor can drop its fields (0.544031ms)
+✔ seed retains all requested incomplete data and can be serialized (3.598522ms)
+✔ save and reload round-trip, null prices do not become zero (0.825917ms)
+✔ corrupt data is not overwritten on load (0.247153ms)
+✔ storage denial and quota failure are reported without throwing (0.538713ms)
+✔ import rejects malformed schemas, negative values and division by zero (0.663342ms)
+✔ import rejects duplicates, broken references, dish references, and cycles (1.119129ms)
+✔ import validates loss/output agreement, prep ready mass and dimensional conversions (0.512253ms)
+✔ malicious markup remains plain data and unknown fields are not copied (0.188535ms)
+✔ import rejects IDs with spaces, quotes, selector punctuation, and non-Latin letters (0.38461ms)
+✔ import allows 100 recipe levels but rejects deeper graphs before recursive calculation (1.759847ms)
+✔ ingredient rows are not limited by the recipe nesting bound (0.544131ms)
+ℹ tests 119
+ℹ suites 0
+ℹ pass 119
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1090.452104
+Browser checks use an isolated local server: http://127.0.0.1:46779/kitchen-calculator/
+PASS Test-key sentinel remains unchanged throughout production workflow at 1366px
+PASS Test-key sentinel remains unchanged throughout production workflow at 360px
+PASS Test-key sentinel remains unchanged throughout production workflow at 390px
+PASS Test-key sentinel remains unchanged throughout production workflow at 430px
+PASS Recipe card, prices, temporary portions, print and list navigation
+PASS Recipe edits survive navigation as a separate draft until explicit save
+PASS Mobile cards and multi-page A4 print preserve all rows with and without prices
+PASS Corrupt browser data is never replaced by seed or a new save
+PASS Initial editable gyro, missing prices and honest incomplete total
+PASS Synonym search from first letter, uppercase keyboard and mouse selection
+PASS Processing output/loss synchronized; commas, dot, invalid negatives and percentages
+PASS Invalid numeric input survives adding a row and can be corrected
+PASS Product edits persist on reload; used product cannot be deleted
+PASS Create product, prep and dish through UI; 83.33 example and dependent price updates
+PASS At least 30 ingredient rows, remove and save/reload
+PASS Export downloads validated JSON; import replacement requires confirmation; cancel and invalid preserve state
+PASS Nested prep cycles are excluded from picker and rejected on import
+PASS Mobile touch selection and layouts 360/390/430: no page overflow, last field visible
+PASS Explicit save quota failure reports in-memory status rather than saved
+PASS Unavailable localStorage reports error and still permits export
+Browser checks: 20 passed, 0 failed.
+PASS compact products: 12 records, 360px
+PASS compact products: 100 records, 360px
+PASS compact products: 500 records, 360px
+PASS compact products: 12 records, 390px
+PASS compact products: 100 records, 390px
+PASS compact products: 500 records, 390px
+PASS compact products: 12 records, 430px
+PASS compact products: 100 records, 430px
+PASS compact products: 500 records, 430px
+PASS compact products: 12 records, 1366px
+PASS compact products: 100 records, 1366px
+PASS compact products: 500 records, 1366px
+12/12 compact product-list browser scenarios passed; 0 failures.
+PASS shared library: prep, 12 records, 360px
+PASS shared library: prep, 100 records, 360px
+PASS shared library: prep, 500 records, 360px
+PASS shared library: prep, 12 records, 390px
+PASS shared library: prep, 100 records, 390px
+PASS shared library: prep, 500 records, 390px
+PASS shared library: prep, 12 records, 430px
+PASS shared library: prep, 100 records, 430px
+PASS shared library: prep, 500 records, 430px
+PASS shared library: prep, 12 records, 1366px
+PASS shared library: prep, 100 records, 1366px
+PASS shared library: prep, 500 records, 1366px
+PASS shared library: dish, 12 records, 360px
+PASS shared library: dish, 100 records, 360px
+PASS shared library: dish, 500 records, 360px
+PASS shared library: dish, 12 records, 390px
+PASS shared library: dish, 100 records, 390px
+PASS shared library: dish, 500 records, 390px
+PASS shared library: dish, 12 records, 430px
+PASS shared library: dish, 100 records, 430px
+PASS shared library: dish, 500 records, 430px
+PASS shared library: dish, 12 records, 1366px
+PASS shared library: dish, 100 records, 1366px
+PASS shared library: dish, 500 records, 1366px
+24/24 shared-library browser scenarios passed; 0 failures.
+PASS packaging: per-portion materials, temporary scaling, JSON and print at 1366px
+PASS packaging: per-portion materials, temporary scaling, JSON and print at 360px
+PASS packaging: per-portion materials, temporary scaling, JSON and print at 390px
+PASS packaging: per-portion materials, temporary scaling, JSON and print at 430px
+PASS packaging: arbitrary catalog names, units, search, edits and guarded deletion
+PASS packaging: invalid quantities retain input and missing prices are visibly incomplete
+PASS packaging: duplicate food and nested ingredients are not charged twice unless explicitly additional
+PASS packaging: saved ingredient identity prevents double charging after food and material renames
+PASS packaging: nonempty prep packaging is rejected without replacing current or legacy data
+PASS packaging: old JSON remains unchanged and bad packaging imports preserve existing data
+10/10 packaging browser scenarios passed; 0 failures.
+PASS task8: new recipe restores all entered fields and invalid raw values after immediate refresh
+PASS task8: edited recipe and packaging survive navigation without overwriting the saved card
+PASS task8: different dishes and preparations keep separate drafts; explicit save clears only one
+PASS task8: closing a tab and reopening in the same browser context offers the draft
+PASS task8: deleting a draft requires confirmation and preserves the saved recipe
+PASS task8: draft quota keeps the previous checkpoint and main data and warns before unsafe navigation
+PASS task8: a damaged draft envelope is not overwritten and never damages the main database
+PASS task8: a malformed draft cannot break the app or overwrite the saved database
+PASS task8: a pending photo import locks editing and navigation while preserving the pre-import draft
+PASS task8: photo is compressed, persists through draft recovery and explicit save, and does not affect costs
+PASS task8: replacing and removing a photo remain drafts until explicitly saved
+PASS task8: bad and oversized photo input leaves the saved image and main recipe intact
+PASS task8: photo storage quota preserves the previous photo, saved recipe and recoverable draft
+PASS task8: a failed main save keeps the separate photo draft until saving succeeds
+PASS task8: a missing local photo is reported; printing without a photo remains possible
+PASS task8: print photo and price controls work independently; screen photo stays visible
+PASS task8: JSON includes portable photos and imports into a fresh browser; old backups remain compatible
+PASS task8: export preserves an unfinished draft without silently saving it as a recipe
+PASS task8: photos, drafts and the white working surfaces fit 320px
+PASS task8: photos, drafts and the white working surfaces fit 390px
+PASS task8: photos, drafts and the white working surfaces fit 1366px
+21 task8 browser scenarios passed; 0 failures.
+PASS two photos: two equal frames stay under the title, empty slots never create photos
+PASS two photos: two independent uploads, replacement and swap persist without changing food or packaging
+PASS two photos: deletion confirms independently; a single photo can move slots and prints once
+PASS two photos: two photo draft IDs survive actual tab close, restore and explicit save
+PASS two photos: camera and gallery inputs are separate per slot and share safe image handling
+PASS two photos: viewer opens whole image, zooms and closes with Escape without modifying saved or draft data
+PASS two photos: touch pinch enlarges the image inside the viewer without changing page width or recipe
+PASS two photos: photo quota while replacing one slot preserves both prior photos and recoverable draft
+PASS two photos: two-photo portable JSON restores fresh IDs on another browser and preserves bytes
+PASS two photos: bad second imported photo rolls back new first photo without touching old data
+PASS two photos: quota during second imported photo rolls back only staged IDs
+PASS two photos: old one-photo JSON and local recipes remain readable without eager migration
+PASS two photos: four print combinations show both photos or no blocks independently of prices
+PHOTO_QUALITY {"newWidth":1920,"newHeight":1280,"newBytes":377630,"newPSNR":35.44895230361551,"oldWidth":1280,"oldHeight":853,"oldBytes":140085,"oldPSNR":28.549382883485617}
+PASS two photos: quality budget retains 1920px details with bounded memory; EXIF orientation is normalized
+PASS two photos: equal frames, contained images and top controls fit 320px
+PASS two photos: equal frames, contained images and top controls fit 390px
+PASS two photos: equal frames, contained images and top controls fit 768px
+PASS two photos: equal frames, contained images and top controls fit 1366px
+18 two-photo browser scenarios passed; 0 failures.
+PASS card modes: chef shows ready one-portion quantities and tags only linked preparations
+PASS card modes: calculation keeps the original cost, raw amount, output and preparation labels
+PASS card modes: missing prices never hide a known ready quantity or leak financial issues into chef form
+PASS card modes: invalid portions never expose a stale financial card after switching to chef mode
+PASS card modes: photo choices are independent per form, screen keeps both photos and storage never changes
+PASS card modes: an unavailable photo in slot 1 does not block printing the other slot
+PASS card modes: an unavailable photo in slot 2 does not block printing the other slot
+PASS card modes: eight A4 print combinations contain exactly the requested photographs and correct form data
+PASS card modes: long ingredient tables repeat headers and preserve final rows and technology in both forms
+PASS card modes: both forms and their photo choices preserve portable JSON and old recipe compatibility
+PASS card modes: an actual browser restart keeps the single saved recipe and both local photographs
+PASS card modes: both forms and photo controls fit 320px without horizontal scrolling
+PASS card modes: both forms and photo controls fit 390px without horizontal scrolling
+PASS card modes: both forms and photo controls fit 768px without horizontal scrolling
+PASS card modes: both forms and photo controls fit 1366px without horizontal scrolling
+15 card-mode browser scenarios passed; 0 failures.
+PASS recovery: old production alone is opened without initialization or legacy reads
+PASS recovery: only legacy: active database stays absent; raw export and cancellation preserve it
+PASS recovery: different nonempty sources show counts/names and can both be downloaded
+PASS recovery: two legacy photos are copied safely; repeated restoration and reload do not duplicate
+PASS recovery: corrupt production is preserved literally in a backup before explicit recovery
+PASS recovery: corrupt legacy does not prevent working with production and remains downloadable
+PASS recovery: production recipes with old photo references can explicitly copy legacy assets without changing the test book
+PASS recovery: no keys: no demonstration base is written; an explicit product save survives reload
+PASS recovery: denied localStorage is explicit and never looks like successful persistence
+PASS recovery: ordinary save quota preserves the old database and can export the in-memory changes
+PASS recovery: external production changes block stale saves but still allow exporting unsaved product input
+PASS recovery: backup quota prevents all replacement and photo staging
+PASS recovery: main quota after staging keeps both bases/photos and the durable backup
+PASS recovery: missing legacy photo blocks replacement and never creates a legacy database
+PASS recovery: another tab changing production during photo preparation aborts and rolls back staging
+PASS recovery: legacy draft with a photo and conflicting ID is copied independently and only once
+PASS recovery: ordinary JSON import backs up the book and photographs without reading legacy
+PASS recovery: a conflicting copied recipe restores invalid row input and saves beside the original without duplicate IDs
+PASS recovery: unknown future fields are downloadable but never silently discarded
+PASS recovery: recovery panel, backup list and source buttons fit 390px
+PASS recovery: recovery panel, backup list and source buttons fit 320px
+PASS recovery: same-origin production/test storage modules cannot overwrite or delete each other
+PASS recovery: real browser restart retains the updated production book, price, photographs and draft
+23 storage-recovery browser scenarios passed; 0 failures.

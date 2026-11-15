@@ -1,0 +1,139 @@
+[
+  {
+    "name": "old production alone is opened without initialization or legacy reads",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "only legacy: active database stays absent; raw export and cancellation preserve it",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "different nonempty sources show counts/names and can both be downloaded",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "two legacy photos are copied safely; repeated restoration and reload do not duplicate",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "corrupt production is preserved literally in a backup before explicit recovery",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "corrupt legacy does not prevent working with production and remains downloadable",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "production recipes with old photo references can explicitly copy legacy assets without changing the test book",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "no keys: no demonstration base is written; an explicit product save survives reload",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "denied localStorage is explicit and never looks like successful persistence",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "ordinary save quota preserves the old database and can export the in-memory changes",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "external production changes block stale saves but still allow exporting unsaved product input",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "backup quota prevents all replacement and photo staging",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "main quota after staging keeps both bases/photos and the durable backup",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "missing legacy photo blocks replacement and never creates a legacy database",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "another tab changing production during photo preparation aborts and rolls back staging",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "legacy draft with a photo and conflicting ID is copied independently and only once",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "ordinary JSON import backs up the book and photographs without reading legacy",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "a conflicting copied recipe restores invalid row input and saves beside the original without duplicate IDs",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "unknown future fields are downloadable but never silently discarded",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "recovery panel, backup list and source buttons fit 390px",
+    "width": 390,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "recovery panel, backup list and source buttons fit 320px",
+    "width": 320,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "same-origin production/test storage modules cannot overwrite or delete each other",
+    "width": 1366,
+    "passed": true,
+    "consoleErrors": []
+  },
+  {
+    "name": "real browser restart after version update",
+    "passed": true,
+    "consoleErrors": []
+  }
+]

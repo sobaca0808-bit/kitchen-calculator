@@ -4,9 +4,9 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const {chromium}=require('playwright');
-const TEST_KEY='kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY='kitchen-calculator-pr2-browser-drafts-v1';
-const PRODUCTION_KEY='kitchen-calculator-v1';
+const TEST_KEY='kitchen-calculator-v1';
+const DRAFT_KEY='kitchen-calculator-drafts-v1';
+const PRODUCTION_KEY='kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL='{"fictional":"issue-7-protected-production-placeholder"}';
 const testURL=process.env.KITCHEN_TEST_URL;
 if(!testURL)throw Error('KITCHEN_TEST_URL must point to a disposable loopback server.');
@@ -38,7 +38,7 @@ function hasMoney(text,amount){
 }
 async function guard(page){
   assert.equal(await page.evaluate(()=>KitchenStorage.KEY),TEST_KEY);
-  assert.match(await page.locator('.test-notice').innerText(),/ТЕСТ/);
+  assert.match(await page.locator('.test-notice').innerText(),/Рабочий калькулятор/);
 }
 async function isolation(page,expectSentinel=true){
   const proof=await page.evaluate(key=>({ops:window.__packagingStorageOps.slice(),sentinel:window.__readPackagingSentinel(key)}),PRODUCTION_KEY);
@@ -128,7 +128,7 @@ async function test(name,fn,{width=1366,data=fixture(false)}={}){
       assert.deepEqual(await stored(page),beforeScale,'Scaling is a temporary view only');
       await isolation(page);await page.reload();await guard(page);hasMoney(await page.locator('.packaging-card .packaging-subtotal').innerText(),20);
       const downloadPromise=page.waitForEvent('download');await page.locator('#export').click();const download=await downloadPromise;
-      assert.match(download.suggestedFilename(),/^kitchen-calculator-PR2-TEST-/);
+      assert.match(download.suggestedFilename(),/^kitchen-calculator-/);
       const raw=await fs.readFile(await download.path(),'utf8');assert(!raw.includes('issue-7-protected-production-placeholder'));
       const backup=JSON.parse(raw);assert.deepEqual(backup.packaging,saved.packaging);assert.deepEqual(backup.recipes[0].packaging,saved.recipes[0].packaging);
       await importJSON(page,backup);assert.deepEqual(await stored(page),backup);

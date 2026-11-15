@@ -4,9 +4,9 @@
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 
-const PREVIEW_KEY = 'kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
-const PRODUCTION_KEY = 'kitchen-calculator-v1';
+const PREVIEW_KEY = 'kitchen-calculator-v1';
+const DRAFT_KEY = 'kitchen-calculator-drafts-v1';
+const PRODUCTION_KEY = 'kitchen-calculator-pr2-browser-test-v1';
 const SENTINEL = '{"fictional":"issue-4-protected-production-placeholder"}';
 const testURL = process.env.KITCHEN_TEST_URL;
 if (!testURL) throw Error('KITCHEN_TEST_URL must point to a disposable loopback server.');
@@ -40,7 +40,7 @@ const stored = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)
 const row = (page, n) => page.locator(`[data-open="${productId(n)}"]`);
 async function guard(page) {
   assert.equal(await page.evaluate(() => KitchenStorage.KEY), PREVIEW_KEY, 'Only the isolated test namespace is allowed');
-  assert.match(await page.locator('.test-notice').innerText(), /ТЕСТ/, 'The test-site warning must be present');
+  assert.match(await page.locator('.test-notice').innerText(), /Рабочий калькулятор/, 'The test-site warning must be present');
 }
 async function checkStorageIsolation(page, expectSentinel = true) {
   const proof = await page.evaluate(key => {

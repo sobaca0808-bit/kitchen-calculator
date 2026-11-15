@@ -5,21 +5,24 @@
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const Seed = require('../js/seed.js');
 const { chromium } = require('playwright');
 const URL = process.env.KITCHEN_TEST_URL || 'http://127.0.0.1:8765';
-const PREVIEW_KEY = 'kitchen-calculator-pr2-browser-test-v1';
-const DRAFT_KEY = 'kitchen-calculator-pr2-browser-drafts-v1';
+const PREVIEW_KEY = 'kitchen-calculator-v1';
+const DRAFT_KEY = 'kitchen-calculator-drafts-v1';
 const previewOperation = op => op.method !== 'clear' && [PREVIEW_KEY,DRAFT_KEY].includes(op.key);
 const target = new globalThis.URL(URL);
 const local = ['localhost','127.0.0.1','[::1]'].includes(target.hostname);
-const publishedTest = target.protocol === 'https:' && target.hostname === 'sobaca0808-bit.github.io' && target.pathname.startsWith('/kitchen-calculator-test/');
-if (!['http:','https:'].includes(target.protocol) || (!local && !publishedTest)) {
-  throw Error('Browser checks are limited to localhost and the isolated kitchen-calculator-test site.');
+if (!['http:','https:'].includes(target.protocol) || !local) {
+  throw Error('Storage regression checks run only on disposable loopback origins.');
 }
 let browser, passed = 0, failed = 0;
 const errors = [];
 async function test(name, fn, options = {}) {
   const context = await browser.newContext({ viewport: {width:1366,height:900},acceptDownloads:true,...options });
+  await context.addInitScript(({key,data})=>{
+    try{if(localStorage.getItem(key)===null&&!window.__skipSeedFixture)localStorage.setItem(key,JSON.stringify(data));}catch(_){}
+  },{key:PREVIEW_KEY,data:Seed.create()});
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
   const pageErrors = [];
@@ -31,7 +34,7 @@ async function test(name, fn, options = {}) {
   try {
     await page.goto(URL);
     assert.equal(await page.evaluate(() => KitchenStorage.KEY),PREVIEW_KEY,'Only the isolated preview may be tested');
-    assert.match(await page.locator('.test-notice').innerText(),/ТЕСТ/);
+    assert.match(await page.locator('.test-notice').innerText(),/Рабочий калькулятор/);
     if (!options.card) await editIfCard(page);
     await fn(page,context);
     assert.deepEqual(pageErrors,[], 'No application JS exceptions');
@@ -54,10 +57,10 @@ async function importJSON(page,data,accept = true) {
 (async () => {
   browser = await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',headless:true,args:['--no-sandbox']});
   for (const width of [1366,360,390,430]) {
-    await test(`Production-key sentinel remains unchanged throughout preview workflow at ${width}px`,async(page,context)=>{
+    await test(`Test-key sentinel remains unchanged throughout production workflow at ${width}px`,async(page,context)=>{
       const sentinel = '{"fictional":"protected-production-placeholder"}';
       await page.evaluate(value=>{
-        localStorage.setItem('kitchen-calculator-v1',value);
+        localStorage.setItem('kitchen-calculator-pr2-browser-test-v1',value);
         localStorage.setItem('unrelated-sentinel',value);
       },sentinel);
       await context.addInitScript(()=>{
@@ -92,7 +95,7 @@ async function importJSON(page,data,accept = true) {
       assert.match(await page.locator('#recipe-card').innerText(),/Проверочная карточка/);
       const downloadPromise=page.waitForEvent('download');await page.locator('#export').click();
       const download=await downloadPromise;
-      assert.match(download.suggestedFilename(),/^kitchen-calculator-PR2-TEST-/);
+      assert.match(download.suggestedFilename(),/^kitchen-calculator-/);
       const raw=await fs.readFile(await download.path(),'utf8');
       assert(!raw.includes('protected-production-placeholder'));
       const backup=JSON.parse(raw);
@@ -107,7 +110,7 @@ async function importJSON(page,data,accept = true) {
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       const proof=await page.evaluate(()=>({
         ops:window.__previewStorageOps.slice(),
-        production:localStorage.getItem('kitchen-calculator-v1'),
+        production:localStorage.getItem('kitchen-calculator-pr2-browser-test-v1'),
         unrelated:localStorage.getItem('unrelated-sentinel')
       }));
       assert.equal(proof.production,sentinel);assert.equal(proof.unrelated,sentinel);
@@ -323,10 +326,9 @@ async function importJSON(page,data,accept = true) {
     assert(bar.y>=0 && bar.y+bar.height<=844,'Compact total and add action stay inside mobile viewport');
     await page.screenshot({path:'/tmp/kitchen-mobile.png'});
   },{hasTouch:true,isMobile:true,viewport:{width:390,height:844}});
-  await test('Initial quota failure reports in-memory status rather than saved',async(page,context)=>{
-    await page.evaluate(()=>localStorage.removeItem(KitchenStorage.KEY));
+  await test('Explicit save quota failure reports in-memory status rather than saved',async(page,context)=>{
     await context.addInitScript(()=>{Storage.prototype.setItem=function(){throw new DOMException('Quota exceeded','QuotaExceededError');};});
-    await page.reload();await editIfCard(page);assert.match(await page.locator('#message').innerText(),/не разрешил сохранение/i);
+    await page.reload();await editIfCard(page);await page.locator('#item-name').fill('Несохранённая работа');await page.locator('#save-item').click();assert.match(await page.locator('#message').innerText(),/Не удалось сохранить/i);
     assert.match(await page.locator('#save-state').innerText(),/В памяти/);
   });
   await test('Unavailable localStorage reports error and still permits export',async(page,context)=>{

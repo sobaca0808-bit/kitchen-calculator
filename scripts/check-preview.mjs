@@ -6,8 +6,9 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
-const mount='/kitchen-calculator-test';
-const logicTests=['calculations','storage','recipe-view','recipe-card-model','preview-isolation','pages','packaging','drafts','photos','photo-print-selection'].map(name=>'tests/'+name+'.test.js');
+const mount='/kitchen-calculator';
+// The release did not include recipe-view/preview-isolation/pages test files.
+const logicTests=['calculations','storage','recipe-card-model','packaging','drafts','photos','photo-print-selection','storage-recovery'].map(name=>'tests/'+name+'.test.js');
 function run(args,env=process.env) {
   return new Promise((done,reject)=>{
     const child=spawn(process.execPath,args,{cwd:root,env,stdio:'inherit'});
@@ -18,6 +19,8 @@ function run(args,env=process.env) {
 const runtimeFiles=new Map([
   ['/','index.html'],['/index.html','index.html'],['/styles.css','styles.css'],['/assets/food-pattern.svg','assets/food-pattern.svg'],
   ['/assets/gastronomic-background.webp','assets/gastronomic-background.webp'],
+  ['/assets/storage-recovery.css','assets/storage-recovery.css'],
+  ['/js/storage-recovery.js','js/storage-recovery.js'],['/js/storage-recovery-ui.js','js/storage-recovery-ui.js'],
   ...['calculations','seed','storage','recipe-view','recipe-card-model','recipe-card-templates','packaging','packaging-ui','drafts','photo-viewer','photos','app'].map(name=>['/js/'+name+'.js','js/'+name+'.js'])
 ]);
 const server=createServer(async(req,res)=>{
@@ -43,5 +46,6 @@ try {
   await run(['tests/task8.browser.test.js'],{...process.env,KITCHEN_TEST_URL:testURL});
   await run(['tests/two-photos.browser.test.js'],{...process.env,KITCHEN_TEST_URL:testURL});
   await run(['tests/card-modes.browser.test.js'],{...process.env,KITCHEN_TEST_URL:testURL});
+  await run(['tests/storage-recovery.browser.test.js'],{...process.env,KITCHEN_TEST_URL:testURL});
 } catch(error){console.error(error.message);process.exitCode=1;}
 finally {await new Promise(done=>server.close(done));}

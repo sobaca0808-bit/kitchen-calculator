@@ -134,15 +134,15 @@ test('old version1 backups stay byte-structure compatible and optional fields ar
   const original=Seed.create(), roundtrip=S.parseJSON(S.stringify(original));
   assert.deepEqual(roundtrip,original);assert.equal(Object.hasOwn(roundtrip,'packaging'),false);
   assert(roundtrip.recipes.every(recipe=>!Object.hasOwn(recipe,'packaging')));
-  assert.equal(S.KEY,'kitchen-calculator-pr2-browser-test-v1');
+  assert.equal(S.KEY,'kitchen-calculator-v1');
   assert.equal(P.calculate(original,original.recipes[0]).knownCost,0);
 });
 test('new packaging catalog and per-portion rows survive JSON/save/load without touching old data',()=>{
-  const state=fixture(), serialized=S.stringify(state), entries=new Map([['kitchen-calculator-v1','{"fictional":"protected"}']]);
+  const state=fixture(), serialized=S.stringify(state), entries=new Map([['kitchen-calculator-pr2-browser-test-v1','{"fictional":"protected"}']]);
   const writes=[];const storage={getItem:key=>entries.get(key)??null,setItem(key,value){writes.push(key);entries.set(key,value);}};
   assert.equal(S.save(state,storage).ok,true);assert.deepEqual(S.load(storage).data,state);
   assert.deepEqual(S.parseJSON(serialized),state);assert.deepEqual(writes,[S.KEY]);
-  assert.equal(entries.get('kitchen-calculator-v1'),'{"fictional":"protected"}');
+  assert.equal(entries.get('kitchen-calculator-pr2-browser-test-v1'),'{"fictional":"protected"}');
   const denied={getItem:storage.getItem,setItem(){throw Error('QuotaExceededError');}};
   assert.equal(S.save(state,denied).ok,false);assert.equal(entries.get(S.KEY),serialized);
 });

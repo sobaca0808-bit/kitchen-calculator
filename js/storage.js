@@ -4,8 +4,8 @@
   else root.KitchenStorage = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
-  // Separate preview namespace: never read or write the live calculator key.
-  const KEY = 'kitchen-calculator-pr2-browser-test-v1';
+  // Permanent production namespace. Recovery of the erroneous release is explicit.
+  const KEY = 'kitchen-calculator-v1';
   const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
   const MAX_PHOTO_BYTES = 500 * 1024;
   const MAX_PHOTO_SIDE = 1920;
@@ -252,30 +252,48 @@
     if (bytes > MAX_IMPORT_BYTES) fail('Резервная копия больше 50 МБ. Уменьшите число фотографий перед экспортом.');
     return source;
   }
+  function assertSupported(original,clean,path='база') {
+    if(!original||typeof original!=='object')return;
+    for(const key of Object.keys(original)) {
+      if(!clean||!Object.hasOwn(clean,key)) fail('Поле «'+path+'.'+key+'» не поддерживается этой версией. Скачайте исходный JSON; восстановление с потерей полей запрещено.');
+      if(original[key]&&typeof original[key]==='object')assertSupported(original[key],clean[key],path+'.'+key);
+    }
+  }
   function getStorage(explicit) {
     if (explicit !== undefined) return explicit;
     if (typeof globalThis.localStorage === 'undefined') fail('Локальное хранилище недоступно в этом браузере.');
     return globalThis.localStorage;
   }
-  function load(storage) {
+  function snapshot(storage) {
+    let source;
     try {
-      const source = getStorage(storage).getItem(KEY);
-      return { data: source === null ? null : parseJSON(source), error: null };
+      source = getStorage(storage).getItem(KEY);
+      const data=source===null?null:parseJSON(source);
+      if(source!==null)assertSupported(JSON.parse(source),data);
+      return { data, error: null, source };
     } catch (error) {
-      return { data: null, error: 'Не удалось загрузить сохранённые данные: ' + error.message + ' Исходная запись не изменена.' };
+      return { data: null, error: 'Не удалось загрузить сохранённые данные: ' + error.message + ' Исходная запись не изменена.', source };
     }
   }
-  function save(data, storage) {
+  function load(storage) {
+    const {data,error}=snapshot(storage);
+    return {data,error};
+  }
+  function save(data, storage, expectedSource) {
     try {
       if (Array.isArray(data?.recipes) && data.recipes.some(recipe => recipe.photo !== undefined || recipe.photos !== undefined)) {
         fail('Сначала сохраните фотографии в отдельном хранилище устройства.');
       }
       const serialized = stringify(data);
-      getStorage(storage).setItem(KEY, serialized);
+      const target=getStorage(storage);
+      if (arguments.length >= 3 && target.getItem(KEY) !== expectedSource) {
+        fail('Рабочая база изменилась в другой вкладке. Скачайте изменения и заново откройте калькулятор.');
+      }
+      target.setItem(KEY, serialized);
       return { ok: true, error: null };
     } catch (error) {
       return { ok: false, error: 'Не удалось сохранить данные: ' + error.message + ' Скачайте JSON, чтобы не потерять изменения.' };
     }
   }
-  return { KEY, MAX_IMPORT_BYTES, MAX_PHOTO_BYTES, MAX_PHOTO_SIDE, MAX_RECIPE_DEPTH, validate, parseJSON, stringify, load, save };
+  return { KEY, MAX_IMPORT_BYTES, MAX_PHOTO_BYTES, MAX_PHOTO_SIDE, MAX_RECIPE_DEPTH, validate, parseJSON, stringify, assertSupported, snapshot, load, save };
 });
