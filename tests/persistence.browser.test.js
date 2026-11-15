@@ -31,6 +31,7 @@ const name='Рис для проверки сохранения';
    await page.reload();
    data=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)),key);
    assert.equal(data.products[0].price,150);
+   await page.locator('[data-tab="products"]').click();
    assert.equal(await page.locator('[data-open]').count(),1);
    await page.locator('[data-tab="dish"]').click();
    await page.locator('#create').click();
